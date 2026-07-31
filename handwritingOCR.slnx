@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="handwritingocr.client/handwritingocr.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="handwritingOCR.Server/handwritingOCR.Server.csproj" />
+</Solution>

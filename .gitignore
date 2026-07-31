@@ -1,0 +1,17 @@
+# Liquibase
+liquibase/liquibase.properties
+
+# .NET
+**/bin/
+**/obj/
+*.user
+
+# Frontend
+**/node_modules/
+**/dist/
+
+handwritingOCR.Server/uploads/
+
+handwritingOCR.Server/appsettings.Development.json
+
+.vs/
