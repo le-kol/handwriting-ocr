@@ -9,11 +9,16 @@ namespace handwritingOCR.Server.Controllers
     {
         private readonly FileStorageService _fileStorageService;
         private readonly ScanDbService _scanDbService;
+        private readonly YandexOcrService _yandexOcrService;
 
-        public ScansController(FileStorageService fileStorageService, ScanDbService scanDbService)
+        public ScansController(
+            FileStorageService fileStorageService,
+            ScanDbService scanDbService,
+            YandexOcrService yandexOcrService)
         {
             _fileStorageService = fileStorageService;
             _scanDbService = scanDbService;
+            _yandexOcrService = yandexOcrService;
         }
 
         // Метод для загрузки файлов изображений на сервер
@@ -60,6 +65,34 @@ namespace handwritingOCR.Server.Controllers
             }
 
             return File(fileBytes, contentType);
+        }
+
+        [HttpPost("{id}/recognize")]
+        public async Task<IActionResult> Recognize(int id, CancellationToken cancellationToken)
+        {
+            string? path = await _scanDbService.GetScanPathAsync(id);
+            if (path == null) return NotFound("Не найдена запись в БД");
+
+            var fileBytes = await _fileStorageService.GetFileAsync(path);
+            if (fileBytes == null) return NotFound("Не найден файл");
+
+            try
+            {
+                var text = await _yandexOcrService.RecognizeAsync(fileBytes, Path.GetExtension(path), cancellationToken);
+                return Ok(new { text });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, ex.Message);
+            }
+            catch (HttpRequestException ex)
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, ex.Message);
+            }
         }
     }
 }
