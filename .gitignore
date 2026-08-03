@@ -5,6 +5,7 @@ liquibase/liquibase.properties
 **/bin/
 **/obj/
 *.user
+*.http
 
 # Frontend
 **/node_modules/
