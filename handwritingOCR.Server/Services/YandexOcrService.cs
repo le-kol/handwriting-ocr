@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using handwritingOCR.Server.Models;
 
 namespace handwritingOCR.Server.Services
 {
@@ -15,7 +17,11 @@ namespace handwritingOCR.Server.Services
             _configuration = configuration;
         }
 
-        public async Task<string> RecognizeAsync(byte[] imageBytes, string fileExtension, CancellationToken cancellationToken = default)
+        // У возвращённых слов уже заполнен OrderIndex
+        public async Task<IReadOnlyList<Word>> RecognizeAsync(
+            byte[] imageBytes,
+            string fileExtension,
+            CancellationToken cancellationToken = default)
         {
             var mimeType = GetMimeType(fileExtension);
             var apiKey = _configuration["YandexOcr:ApiKey"];
@@ -61,15 +67,97 @@ namespace handwritingOCR.Server.Services
                     $"Yandex OCR вернул {(int)response.StatusCode}: {responseBody}");
             }
 
+            return ParseWords(responseBody);
+        }
+
+        // Слова лежат в ответе на третьем уровне вложенности: blocks -> lines -> words.
+        // Порядок обхода этой структуры и есть порядок чтения текста
+        private static List<Word> ParseWords(string responseBody)
+        {
+            var words = new List<Word>();
+
             using var document = JsonDocument.Parse(responseBody);
-            if (document.RootElement.TryGetProperty("result", out var result) &&
-                result.TryGetProperty("textAnnotation", out var textAnnotation) &&
-                textAnnotation.TryGetProperty("fullText", out var fullText))
+            if (!document.RootElement.TryGetProperty("result", out var result) ||
+                !result.TryGetProperty("textAnnotation", out var textAnnotation) ||
+                !textAnnotation.TryGetProperty("blocks", out var blocks))
             {
-                return fullText.GetString() ?? string.Empty;
+                return words;
             }
 
-            return string.Empty;
+            foreach (var block in blocks.EnumerateArray())
+            {
+                if (!block.TryGetProperty("lines", out var lines))
+                {
+                    continue;
+                }
+
+                foreach (var line in lines.EnumerateArray())
+                {
+                    if (!line.TryGetProperty("words", out var lineWords))
+                    {
+                        continue;
+                    }
+
+                    foreach (var wordElement in lineWords.EnumerateArray())
+                    {
+                        var text = wordElement.TryGetProperty("text", out var textElement)
+                            ? textElement.GetString() ?? string.Empty
+                            : string.Empty;
+
+                        if (string.IsNullOrWhiteSpace(text))
+                        {
+                            continue;
+                        }
+
+                        var word = ParseBoundingBox(wordElement);
+                        word.Text = text;
+                        word.OrderIndex = words.Count;
+                        words.Add(word);
+                    }
+                }
+            }
+
+            return words;
+        }
+
+        private static Word ParseBoundingBox(JsonElement wordElement)
+        {
+            var word = new Word();
+
+            if (!wordElement.TryGetProperty("boundingBox", out var boundingBox) ||
+                !boundingBox.TryGetProperty("vertices", out var vertices))
+            {
+                return word;
+            }
+
+            var points = vertices.EnumerateArray().ToArray();
+            if (points.Length < 4)
+            {
+                return word;
+            }
+
+            word.X1 = ParseCoordinate(points[0], "x");
+            word.Y1 = ParseCoordinate(points[0], "y");
+            word.X2 = ParseCoordinate(points[1], "x");
+            word.Y2 = ParseCoordinate(points[1], "y");
+            word.X3 = ParseCoordinate(points[2], "x");
+            word.Y3 = ParseCoordinate(points[2], "y");
+            word.X4 = ParseCoordinate(points[3], "x");
+            word.Y4 = ParseCoordinate(points[3], "y");
+
+            return word;
+        }
+
+        // Координаты приходят строками ("x": "28"). Нулевые значения API не присылает вовсе,
+        // поэтому отсутствующее свойство — это координата 0, а не признак ошибки
+        private static float ParseCoordinate(JsonElement vertex, string propertyName)
+        {
+            if (!vertex.TryGetProperty(propertyName, out var property))
+            {
+                return 0;
+            }
+
+            return float.Parse(property.GetString()!, CultureInfo.InvariantCulture);
         }
 
         private static string GetMimeType(string extension)

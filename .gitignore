@@ -16,3 +16,4 @@ handwritingOCR.Server/uploads/
 handwritingOCR.Server/appsettings.Development.json
 
 .vs/
+.vscode/

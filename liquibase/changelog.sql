@@ -24,3 +24,11 @@ create table words (
 --rollback DROP TABLE words;
 
 
+--changeset Nikolay:3
+alter table words add column order_index int not null;
+-- deferrable initially deferred: при вставке и перемещении слова порядковые номера соседей
+-- сдвигаются одним UPDATE, из-за чего внутри транзакции возникают временные дубликаты.
+-- Отложенная проверка выполняется один раз при commit, когда нумерация снова корректна
+alter table words add constraint unique_order unique (scan_id, order_index) deferrable initially deferred;
+--rollback alter table words drop column order_index;
+
