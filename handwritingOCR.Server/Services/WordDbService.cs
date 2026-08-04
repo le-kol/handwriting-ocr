@@ -5,7 +5,9 @@ namespace handwritingOCR.Server.Services
 {
     // Сервис работы с таблицей words. Порядок слов на скане задаётся order_index:
     // нумерация плотная (0, 1, 2, ...) и уникальная в пределах скана, поэтому вставка,
-    // удаление и перемещение слова сопровождаются сдвигом номеров соседей.
+    // удаление и перемещение слова сопровождаются сдвигом номеров соседей. Сдвиг одним
+    // UPDATE ненадолго создаёт дубликаты номеров и работает только потому, что ограничение
+    // unique_order объявлено в миграции как deferrable initially deferred.
     // Транзакции откатываются сами при выходе из метода, если не был вызван commit
     public class WordDbService
     {
@@ -245,6 +247,8 @@ namespace handwritingOCR.Server.Services
             return Convert.ToInt32(await command.ExecuteScalarAsync());
         }
 
+        // Каждый метод открывает своё соединение: Npgsql держит пул, поэтому это не создаёт
+        // новое подключение к серверу, зато соединение и транзакция не переживают вызов
         private async Task<NpgsqlConnection> OpenConnectionAsync()
         {
             var connectionString = _configuration.GetConnectionString("Default");

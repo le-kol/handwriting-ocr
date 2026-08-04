@@ -6,6 +6,11 @@ using handwritingOCR.Server.Models;
 
 namespace handwritingOCR.Server.Services
 {
+    // Синхронное распознавание одного изображения через Yandex Vision OCR.
+    // Типы исключений различают причину сбоя, контроллер переводит их в коды ответа:
+    // ArgumentException — неподдерживаемый формат файла,
+    // InvalidOperationException — сервис не настроен в appsettings,
+    // HttpRequestException — Yandex ответил ошибкой
     public class YandexOcrService
     {
         private readonly HttpClient _httpClient;
@@ -109,6 +114,8 @@ namespace handwritingOCR.Server.Services
                             continue;
                         }
 
+                        // Номер берётся из количества уже собранных слов, а не из позиции
+                        // в ответе, поэтому пропуски не оставляют дыр в нумерации
                         var word = ParseBoundingBox(wordElement);
                         word.Text = text;
                         word.OrderIndex = words.Count;
@@ -120,6 +127,8 @@ namespace handwritingOCR.Server.Services
             return words;
         }
 
+        // Если рамки в ответе нет, слово остаётся с нулевыми координатами: оно всё равно
+        // сохранится и попадёт в порядок чтения, но на изображении его нечем подсветить
         private static Word ParseBoundingBox(JsonElement wordElement)
         {
             var word = new Word();
@@ -160,6 +169,8 @@ namespace handwritingOCR.Server.Services
             return float.Parse(property.GetString()!, CultureInfo.InvariantCulture);
         }
 
+        // Вопреки названию поля mimeType, API ждёт короткое имя формата (PNG, JPEG, PDF),
+        // а не MIME-тип вида image/png
         private static string GetMimeType(string extension)
         {
             return extension.ToLowerInvariant() switch

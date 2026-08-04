@@ -22,9 +22,10 @@ namespace handwritingOCR.Server.Services
                 await using (var command = new NpgsqlCommand(insertQuery, connection))
                 {
                     command.Parameters.AddWithValue("p", path);
-                    var insertedId = await command.ExecuteScalarAsync();
+                    // RETURNING всегда отдаёт строку для успешной вставки, null тут невозможен
+                    var insertedId = (int)(await command.ExecuteScalarAsync())!;
 
-                    return (int)insertedId;
+                    return insertedId;
                 }
             }
         }
