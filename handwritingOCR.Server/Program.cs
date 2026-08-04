@@ -6,7 +6,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddScoped<ScanDbService>();
+builder.Services.AddScoped<WordDbService>();
 builder.Services.AddScoped<FileStorageService>();
+// AddHttpClient, а не AddScoped: сервису нужен HttpClient с переиспользуемым пулом соединений
 builder.Services.AddHttpClient<YandexOcrService>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

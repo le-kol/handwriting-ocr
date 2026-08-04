@@ -1,0 +1,4 @@
+changeLogFile=changelog.sql
+liquibase.command.url=jdbc:postgresql://localhost:5432/handwriting_ocr
+liquibase.command.username=postgres
+liquibase.command.password=ВАШ_ПАРОЛЬ

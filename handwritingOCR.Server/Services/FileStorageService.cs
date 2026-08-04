@@ -13,18 +13,28 @@
             _environment = environment;
         }
 
-        // Метод для проверки форматов файлов
+        // Метод для проверки форматов файлов.
+        // Проверяется только расширение имени, содержимое файла не разбирается
         public bool IsAllowed(IFormFile file)
         {
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             return AllowedExtensions.Contains(extension);
         }
 
-        // Метод для сохранения файла изображения на сервер
+        // Метод для сохранения файла изображения на сервер.
+        // Имя заменяется на GUID, чтобы файлы не перезаписывали друг друга, а исходное
+        // имя не сохраняется. Возвращается абсолютный путь — он же попадает в таблицу scans,
+        // поэтому перенос папки со сканами сделает прежние записи нерабочими
         public async Task<string> SaveFileAsync(IFormFile file)
         {
             // Путь до папки для хранения файлов. Задается в appsettings.json
-            var storageFolder = Path.Combine(_environment.ContentRootPath, _configuration["Storage:ScansFolder"]);
+            var scansFolder = _configuration["Storage:ScansFolder"];
+            if (string.IsNullOrWhiteSpace(scansFolder))
+            {
+                throw new InvalidOperationException("Не задан Storage:ScansFolder в appsettings.");
+            }
+
+            var storageFolder = Path.Combine(_environment.ContentRootPath, scansFolder);
             Directory.CreateDirectory(storageFolder);
 
             var savedFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
