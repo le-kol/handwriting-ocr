@@ -32,16 +32,51 @@
 }
 
 /* non-scaling-stroke задаёт толщину в экранных пикселях: без него линия считается
-   в пикселях исходного изображения и на уменьшенном скане почти исчезает */
+   в пикселях исходного изображения и на уменьшенном скане почти исчезает.
+   pointer-events возвращает рамкам курсор, выключенный у svg целиком; значение all,
+   а не auto, потому что при fill: none попадание считалось бы только по самой линии */
 .scan polygon {
     fill: none;
     stroke: #e5340a;
     stroke-width: 2;
     vector-effect: non-scaling-stroke;
+    pointer-events: all;
+    cursor: pointer;
+}
+
+.scan polygon.selected {
+    stroke: #1b7ff5;
+    stroke-width: 3;
+}
+
+.editor {
+    display: inline-block;
+    margin: 1rem auto;
+    text-align: left;
+}
+
+.coordinates {
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.editor input[type="number"] {
+    width: 6rem;
 }
 
 table {
     margin: 0 auto;
+}
+
+tbody tr {
+    cursor: pointer;
+}
+
+/* Переменная объявлена в index.css */
+tbody tr.selected {
+    background: var(--accent-bg);
 }
 
 th, td {
