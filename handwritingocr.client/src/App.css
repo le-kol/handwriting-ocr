@@ -5,6 +5,80 @@
     text-align: center;
 }
 
+/* Контейнер обязан быть строчно-блочным: у блочного ширина была бы во всю строку,
+   а не по картинке, и растянутое на него наложение не совпало бы с изображением */
+.scan {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+}
+
+/* Картинка должна быть блочной: у строчной снизу остаётся отбивка под базовую
+   линию, из-за неё контейнер выше картинки, а рамки съезжают вниз */
+.scan img {
+    display: block;
+    max-width: 100%;
+}
+
+/* Наложение повторяет размеры картинки, дальше координаты пересчитывает viewBox.
+   Рамки не должны перехватывать курсор у картинки */
+.scan svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* non-scaling-stroke задаёт толщину в экранных пикселях: без него линия считается
+   в пикселях исходного изображения и на уменьшенном скане почти исчезает.
+   pointer-events возвращает рамкам курсор, выключенный у svg целиком; значение all,
+   а не auto, потому что при fill: none попадание считалось бы только по самой линии */
+.scan polygon {
+    fill: none;
+    stroke: #e5340a;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+    pointer-events: all;
+    cursor: pointer;
+}
+
+.scan polygon.selected {
+    stroke: #1b7ff5;
+    stroke-width: 3;
+}
+
+.editor {
+    display: inline-block;
+    margin: 1rem auto;
+    text-align: left;
+}
+
+.coordinates {
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.editor input[type="number"] {
+    width: 6rem;
+}
+
+table {
+    margin: 0 auto;
+}
+
+tbody tr {
+    cursor: pointer;
+}
+
+/* Переменная объявлена в index.css */
+tbody tr.selected {
+    background: var(--accent-bg);
+}
+
 th, td {
     padding-left: 1rem;
     padding-right: 1rem;
