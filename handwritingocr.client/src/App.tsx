@@ -30,6 +30,23 @@ function boxPoints(word: Word) {
         word.x4 + "," + word.y4;
 }
 
+// Слова группируются по lineIndex, внутри строки сортируются по orderIndex
+function groupWordsByLine(words: Word[]): Word[][] {
+    const byLine = new Map<number, Word[]>();
+
+    for (const word of words) {
+        const line = byLine.get(word.lineIndex) ?? [];
+        line.push(word);
+        byLine.set(word.lineIndex, line);
+    }
+
+    return [...byLine.entries()]
+        .sort(function (a, b) { return a[0] - b[0]; })
+        .map(function (entry) {
+            return entry[1].sort(function (a, b) { return a.orderIndex - b.orderIndex; });
+        });
+}
+
 // Вставка слова сдвигает order_index у соседей, поэтому после неё локальный список
 // уже не соответствует базе и его приходится перечитывать целиком
 function fetchWords(scanId: number): Promise<Word[]> {
@@ -284,7 +301,7 @@ function App() {
                 </div>
             ) : null}
             {words && words.length > 0 && draft === null ? (
-                <p>Выберите слово в таблице или рамку на скане, чтобы отредактировать</p>
+                <p>Выберите слово в тексте или рамку на скане, чтобы отредактировать</p>
             ) : null}
             {draft ? (
                 <div className="editor">
@@ -328,30 +345,30 @@ function App() {
                 </div>
             ) : null}
             {words && words.length > 0 ? (
-                <table>
-                    <thead>
-                        <tr>
-                            <th>№</th>
-                            <th>Строка</th>
-                            <th>Слово</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {words.map(function (word) {
-                            return (
-                                <tr
-                                    key={word.id}
-                                    className={draft !== null && draft.id === word.id ? "selected" : undefined}
-                                    onClick={function () { handleWordSelect(word); }}
-                                >
-                                    <td>{word.orderIndex}</td>
-                                    <td>{word.lineIndex}</td>
-                                    <td>{word.text}</td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                <div className="recognized-text">
+                    {groupWordsByLine(words).map(function (lineWords) {
+                        return (
+                            <p key={lineWords[0].lineIndex}>
+                                {lineWords.map(function (word, index) {
+                                    const isSelected = draft !== null && draft.id === word.id;
+                                    const shown = isSelected ? draft : word;
+
+                                    return (
+                                        <span key={word.id}>
+                                            {index > 0 ? " " : null}
+                                            <span
+                                                className={isSelected ? "word selected" : "word"}
+                                                onClick={function () { handleWordSelect(word); }}
+                                            >
+                                                {shown.text}
+                                            </span>
+                                        </span>
+                                    );
+                                })}
+                            </p>
+                        );
+                    })}
+                </div>
             ) : null}
         </div>
     )

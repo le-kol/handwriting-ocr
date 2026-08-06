@@ -66,20 +66,27 @@
     width: 6rem;
 }
 
-table {
-    margin: 0 auto;
+.recognized-text {
+    margin: 1rem auto;
+    max-width: 48rem;
+    text-align: left;
+    line-height: 1.6;
 }
 
-tbody tr {
+.recognized-text p {
+    margin: 0 0 0.75rem;
+}
+
+.word {
     cursor: pointer;
+    border-radius: 2px;
 }
 
-/* Переменная объявлена в index.css */
-tbody tr.selected {
+.word:hover {
     background: var(--accent-bg);
 }
 
-th, td {
-    padding-left: 1rem;
-    padding-right: 1rem;
+.word.selected {
+    background: var(--accent-bg);
+    outline: 1px solid #1b7ff5;
 }
