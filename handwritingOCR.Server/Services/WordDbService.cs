@@ -23,7 +23,7 @@ namespace handwritingOCR.Server.Services
             await using var connection = await OpenConnectionAsync();
 
             const string query = """
-                SELECT id, scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index
+                SELECT id, scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index, line_index
                 FROM words
                 WHERE scan_id = @scanId
                 ORDER BY order_index
@@ -130,7 +130,8 @@ namespace handwritingOCR.Server.Services
                     x2 = @x2, y2 = @y2,
                     x3 = @x3, y3 = @y3,
                     x4 = @x4, y4 = @y4,
-                    order_index = @orderIndex
+                    order_index = @orderIndex,
+                    line_index = @lineIndex
                 WHERE id = @wordId
                 """;
 
@@ -259,8 +260,8 @@ namespace handwritingOCR.Server.Services
         }
 
         private const string InsertQuery = """
-            INSERT INTO words (scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index)
-            VALUES (@scanId, @word, @x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4, @orderIndex)
+            INSERT INTO words (scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index, line_index)
+            VALUES (@scanId, @word, @x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4, @orderIndex, @lineIndex)
             """;
 
         // Поля, которые задаёт сервер, а не клиент: id, скан и итоговая позиция слова
@@ -290,6 +291,7 @@ namespace handwritingOCR.Server.Services
                 X4 = reader.GetFloat(9),
                 Y4 = reader.GetFloat(10),
                 OrderIndex = reader.GetInt32(11),
+                LineIndex = reader.GetInt32(12),
             };
         }
 
@@ -307,6 +309,7 @@ namespace handwritingOCR.Server.Services
             command.Parameters.AddWithValue("x4", word.X4);
             command.Parameters.AddWithValue("y4", word.Y4);
             command.Parameters.AddWithValue("orderIndex", orderIndex);
+            command.Parameters.AddWithValue("lineIndex", word.LineIndex);
         }
     }
 }

@@ -16,6 +16,7 @@ interface Word {
     x4: number;
     y4: number;
     orderIndex: number;
+    lineIndex: number;
 }
 
 type CoordinateField = "x1" | "y1" | "x2" | "y2" | "x3" | "y3" | "x4" | "y4";
@@ -143,6 +144,12 @@ function App() {
         // считается до подмены черновика, потому что берётся у выбранного слова
         const wordCount = words ? words.length : 0;
         const orderIndex = draft && draft.id !== 0 ? draft.orderIndex + 1 : wordCount;
+        // Строка наследуется у выбранного слова, иначе у последнего в списке, иначе 0
+        const lineIndex = draft && draft.id !== 0
+            ? draft.lineIndex
+            : words && words.length > 0
+                ? words[words.length - 1].lineIndex
+                : 0;
 
         setDraft({
             // Ноль означает, что записи в БД ещё нет: настоящий id выдаёт сама БД
@@ -155,6 +162,7 @@ function App() {
             x3: 0, y3: 0,
             x4: 0, y4: 0,
             orderIndex,
+            lineIndex,
         });
         setSaveStatus(null);
     }
@@ -163,6 +171,13 @@ function App() {
         const text = event.target.value;
         setDraft(function (current) {
             return current ? { ...current, text } : current;
+        });
+    }
+
+    function handleLineIndexChange(event: React.ChangeEvent<HTMLInputElement>) {
+        const lineIndex = Number(event.target.value);
+        setDraft(function (current) {
+            return current ? { ...current, lineIndex } : current;
         });
     }
 
@@ -281,6 +296,14 @@ function App() {
                     <label>
                         Текст <input value={draft.text} onChange={handleTextChange} />
                     </label>
+                    <label>
+                        Строка{" "}
+                        <input
+                            type="number"
+                            value={draft.lineIndex}
+                            onChange={handleLineIndexChange}
+                        />
+                    </label>
                     <div className="coordinates">
                         {coordinateFields.map(function (field) {
                             return (
@@ -309,6 +332,7 @@ function App() {
                     <thead>
                         <tr>
                             <th>№</th>
+                            <th>Строка</th>
                             <th>Слово</th>
                         </tr>
                     </thead>
@@ -321,6 +345,7 @@ function App() {
                                     onClick={function () { handleWordSelect(word); }}
                                 >
                                     <td>{word.orderIndex}</td>
+                                    <td>{word.lineIndex}</td>
                                     <td>{word.text}</td>
                                 </tr>
                             );

@@ -32,3 +32,8 @@ alter table words add column order_index int not null;
 alter table words add constraint unique_order unique (scan_id, order_index) deferrable initially deferred;
 --rollback alter table words drop column order_index;
 
+--changeset Nikolay:4
+-- Номер строки OCR в пределах скана; default 0 для уже существующих записей
+alter table words add column line_index int not null default 0;
+--rollback alter table words drop column line_index;
+

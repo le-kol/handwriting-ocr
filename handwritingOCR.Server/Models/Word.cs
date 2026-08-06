@@ -21,5 +21,8 @@ namespace handwritingOCR.Server.Models
         public float Y4 { get; set; }
         // Позиция слова в порядке чтения скана, нумерация плотная: 0, 1, 2, ...
         public int OrderIndex { get; set; }
+        // Номер строки OCR в пределах скана, нумерация плотная: 0, 1, 2, ...
+        // У всех слов одной строки одинаковый LineIndex
+        public int LineIndex { get; set; }
     }
 }
