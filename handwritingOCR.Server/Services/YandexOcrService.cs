@@ -22,7 +22,7 @@ namespace handwritingOCR.Server.Services
             _configuration = configuration;
         }
 
-        // У возвращённых слов уже заполнен OrderIndex
+        // У возвращённых слов уже заполнены OrderIndex и LineIndex
         public async Task<IReadOnlyList<Word>> RecognizeAsync(
             byte[] imageBytes,
             string fileExtension,
@@ -80,6 +80,8 @@ namespace handwritingOCR.Server.Services
         private static List<Word> ParseWords(string responseBody)
         {
             var words = new List<Word>();
+            // Общий счётчик строк по всему скану (сквозь все blocks)
+            var lineIndex = 0;
 
             using var document = JsonDocument.Parse(responseBody);
             if (!document.RootElement.TryGetProperty("result", out var result) ||
@@ -103,6 +105,8 @@ namespace handwritingOCR.Server.Services
                         continue;
                     }
 
+                    var wordsBeforeLine = words.Count;
+
                     foreach (var wordElement in lineWords.EnumerateArray())
                     {
                         var text = wordElement.TryGetProperty("text", out var textElement)
@@ -119,7 +123,14 @@ namespace handwritingOCR.Server.Services
                         var word = ParseBoundingBox(wordElement);
                         word.Text = text;
                         word.OrderIndex = words.Count;
+                        word.LineIndex = lineIndex;
                         words.Add(word);
+                    }
+
+                    // Пустые строки (все слова пропущены) не занимают номер
+                    if (words.Count > wordsBeforeLine)
+                    {
+                        lineIndex++;
                     }
                 }
             }
