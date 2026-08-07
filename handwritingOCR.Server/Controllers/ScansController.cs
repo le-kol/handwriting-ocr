@@ -81,9 +81,9 @@ namespace handwritingOCR.Server.Controllers
             return Ok(words);
         }
 
-        // Позиция слова берётся из orderIndex тела запроса.
-        // Поля id и scanId из тела игнорируются: id выдаёт БД, скан задаётся адресом
         [HttpPost("{id}/words")]
+        // Поля id и scanId из тела игнорируются: id выдаёт БД, скан задаётся адресом.
+        // Позицию в тексте задаёт отдельный PUT /words/layout
         public async Task<IActionResult> CreateWord(int id, [FromBody] Word word)
         {
             if (string.IsNullOrWhiteSpace(word.Text))
@@ -91,22 +91,18 @@ namespace handwritingOCR.Server.Controllers
                 return BadRequest("Текст слова не может быть пустым");
             }
 
-            if (word.OrderIndex < 0)
-            {
-                return BadRequest("orderIndex не может быть отрицательным");
-            }
-
             string? path = await _scanDbService.GetScanPathAsync(id);
             if (path == null) return NotFound("Не найдена запись в БД");
 
             word.Text = word.Text.Trim();
-            var inserted = await _wordDbService.InsertAtAsync(id, word.OrderIndex, word);
+            var inserted = await _wordDbService.InsertWordAsync(id, word);
 
             return CreatedAtAction(nameof(GetWords), new { id }, inserted);
         }
 
-        // Поля id и scanId из тела игнорируются: слово определяется адресом
         [HttpPut("{id}/words/{wordId}")]
+        // Поля id и scanId из тела игнорируются: слово определяется адресом.
+        // Меняется только текст и координаты рамки
         public async Task<IActionResult> UpdateWord(int id, int wordId, [FromBody] Word word)
         {
             if (string.IsNullOrWhiteSpace(word.Text))
@@ -114,16 +110,30 @@ namespace handwritingOCR.Server.Controllers
                 return BadRequest("Текст слова не может быть пустым");
             }
 
-            if (word.OrderIndex < 0)
-            {
-                return BadRequest("orderIndex не может быть отрицательным");
-            }
-
             word.Text = word.Text.Trim();
             var updated = await _wordDbService.UpdateWordAsync(id, wordId, word);
             if (updated == null) return NotFound("Слово не найдено");
 
             return Ok(updated);
+        }
+
+        // Принимает раскладку целиком: строки и порядок слов внутри них.
+        // Каждый id скана должен встретиться ровно один раз
+        [HttpPut("{id}/words/layout")]
+        public async Task<IActionResult> ApplyLayout(int id, [FromBody] WordLayoutRequest request)
+        {
+            string? path = await _scanDbService.GetScanPathAsync(id);
+            if (path == null) return NotFound("Не найдена запись в БД");
+
+            try
+            {
+                var words = await _wordDbService.ApplyLayoutAsync(id, request);
+                return Ok(words);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpDelete("{id}/words/{wordId}")]
@@ -135,7 +145,8 @@ namespace handwritingOCR.Server.Controllers
             return NoContent();
         }
 
-        // Результат распознавания полностью заменяет прежние слова скана
+        // Результат распознавания полностью заменяет прежние слова скана:
+        // повторный запуск OCR не должен смешивать новые слова со старыми
         [HttpPost("{id}/recognize")]
         public async Task<IActionResult> Recognize(int id, CancellationToken cancellationToken)
         {
