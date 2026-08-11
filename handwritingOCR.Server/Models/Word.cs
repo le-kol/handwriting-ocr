@@ -24,5 +24,8 @@ namespace handwritingOCR.Server.Models
         // Номер строки OCR в пределах скана, нумерация плотная: 0, 1, 2, ...
         // У всех слов одной строки одинаковый LineIndex
         public int LineIndex { get; set; }
+        // Логически N×4×2: [кривая][P0..P3][x|y]; null — слово ещё не векторизовано.
+        // Пустой массив в БД не хранится; координаты — в системе выровненного фрагмента.
+        public float[,,]? CurvePoints { get; set; }
     }
 }

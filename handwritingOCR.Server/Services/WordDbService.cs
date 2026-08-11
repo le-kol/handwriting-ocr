@@ -1,5 +1,6 @@
 using handwritingOCR.Server.Models;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace handwritingOCR.Server.Services
 {
@@ -24,6 +25,77 @@ namespace handwritingOCR.Server.Services
         {
             await using var connection = await OpenConnectionAsync();
             return await LoadWordsAsync(connection, null, scanId);
+        }
+
+        // null — слова нет или оно принадлежит другому скану
+        public async Task<Word?> GetWordAsync(int scanId, int wordId)
+        {
+            await using var connection = await OpenConnectionAsync();
+            const string query = """
+                SELECT id, scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index, line_index, curve_points
+                FROM words
+                WHERE scan_id = @scanId AND id = @wordId
+                """;
+
+            await using var command = new NpgsqlCommand(query, connection);
+            command.Parameters.AddWithValue("scanId", scanId);
+            command.Parameters.AddWithValue("wordId", wordId);
+
+            await using var reader = await command.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+            {
+                return null;
+            }
+
+            return ReadWord(reader);
+        }
+
+        // Одна колонка, полная замена (не append): пустой/невалидный N×4×2 не пишем,
+        // чтобы сбой векторизации не оставил частичную запись и не затёр прежнее значение.
+        public async Task<Word?> UpdateCurvePointsAsync(int scanId, int wordId, float[,,] curvePoints)
+        {
+            ValidateCurvePointsShape(curvePoints);
+
+            await using var connection = await OpenConnectionAsync();
+            await using var transaction = await connection.BeginTransactionAsync();
+
+            const string updateQuery = """
+                UPDATE words
+                SET curve_points = @curvePoints
+                WHERE id = @wordId AND scan_id = @scanId
+                """;
+
+            await using (var updateCommand = new NpgsqlCommand(updateQuery, connection, transaction))
+            {
+                updateCommand.Parameters.AddWithValue("wordId", wordId);
+                updateCommand.Parameters.AddWithValue("scanId", scanId);
+                var curveParam = new NpgsqlParameter("curvePoints", NpgsqlDbType.Array | NpgsqlDbType.Real)
+                {
+                    Value = curvePoints,
+                };
+                updateCommand.Parameters.Add(curveParam);
+
+                var affected = await updateCommand.ExecuteNonQueryAsync();
+                if (affected == 0)
+                {
+                    return null;
+                }
+            }
+
+            await transaction.CommitAsync();
+            return await GetWordAsync(scanId, wordId);
+        }
+
+        private static void ValidateCurvePointsShape(float[,,] curvePoints)
+        {
+            if (curvePoints.Rank != 3
+                || curvePoints.GetLength(0) < 1
+                || curvePoints.GetLength(1) != 4
+                || curvePoints.GetLength(2) != 2)
+            {
+                throw new ArgumentException(
+                    "curve_points должен быть непустым массивом формы N×4×2.");
+            }
         }
 
         public async Task ReplaceWordsFromOcrAsync(int scanId, IReadOnlyList<Word> words)
@@ -319,7 +391,7 @@ namespace handwritingOCR.Server.Services
             int scanId)
         {
             const string query = """
-                SELECT id, scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index, line_index
+                SELECT id, scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index, line_index, curve_points
                 FROM words
                 WHERE scan_id = @scanId
                 ORDER BY order_index
@@ -354,7 +426,7 @@ namespace handwritingOCR.Server.Services
             VALUES (@scanId, @word, @x1, @y1, @x2, @y2, @x3, @y3, @x4, @y4, @orderIndex, @lineIndex)
             """;
 
-        // Порядок столбцов совпадает с select в GetWordsByScanIdAsync
+        // Порядок столбцов совпадает с select в GetWordsByScanIdAsync / GetWordAsync
         private static Word ReadWord(NpgsqlDataReader reader)
         {
             return new Word
@@ -372,6 +444,7 @@ namespace handwritingOCR.Server.Services
                 Y4 = reader.GetFloat(10),
                 OrderIndex = reader.GetInt32(11),
                 LineIndex = reader.GetInt32(12),
+                CurvePoints = reader.IsDBNull(13) ? null : reader.GetFieldValue<float[,,]>(13),
             };
         }
 

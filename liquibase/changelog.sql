@@ -37,3 +37,8 @@ alter table words add constraint unique_order unique (scan_id, order_index) defe
 alter table words add column line_index int not null default 0;
 --rollback alter table words drop column line_index;
 
+--changeset Nikolay:5
+-- Векторное представление штрихов: логически N×4×2 (кривая / точка Безье / x|y); NULL до векторизации
+alter table words add column curve_points real[];
+--rollback alter table words drop column curve_points;
+
