@@ -33,13 +33,12 @@ namespace handwritingOCR.Server.Imaging
 
             using (source)
             {
-                var quad = new[]
-                {
+                // Yandex OCR vertices: TL → BL → BR → TR. Warp/размеры ждут TL → TR → BR → BL.
+                var quad = ToWarpQuadOrder(
                     new PointF(x1, y1),
                     new PointF(x2, y2),
                     new PointF(x3, y3),
-                    new PointF(x4, y4),
-                };
+                    new PointF(x4, y4));
 
                 EnsureQuadValid(quad);
                 EnsureIntersectsImage(quad, source.Width, source.Height);
@@ -58,6 +57,10 @@ namespace handwritingOCR.Server.Imaging
                 return WarpPerspective(source, padded, outW, outH);
             }
         }
+
+        // Вход — порядок Yandex (TL, BL, BR, TR); выход — TL, TR, BR, BL для WarpPerspective.
+        private static PointF[] ToWarpQuadOrder(PointF tl, PointF bl, PointF br, PointF tr) =>
+            [tl, tr, br, bl];
 
         private static void EnsureQuadValid(PointF[] quad)
         {

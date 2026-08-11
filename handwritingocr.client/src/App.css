@@ -115,3 +115,52 @@
 .word.drop-target {
     outline: 1px dashed #1b7ff5;
 }
+
+/* Таблица слов скана — отдельно от SVG-оверлея изображения */
+.words-section {
+    margin: 1.5rem auto;
+    max-width: 48rem;
+    text-align: left;
+}
+
+.words-section h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.words-section-status {
+    margin: 0 0 0.5rem;
+}
+
+.words-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.words-table th,
+.words-table td {
+    border: 1px solid #ccc;
+    padding: 0.4rem 0.6rem;
+    vertical-align: middle;
+}
+
+.words-table th {
+    background: #f3f3f3;
+    font-weight: 600;
+}
+
+.words-table td.word-curve-cell {
+    width: 5rem;
+    overflow: hidden;
+}
+
+.word-curve-thumb {
+    display: block;
+    width: 4.5rem;
+    height: 2.25rem;
+    color: #222;
+    background: #fafafa;
+    border: 1px solid #ddd;
+}

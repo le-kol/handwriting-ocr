@@ -24,9 +24,9 @@
 
 **Purpose**: Модули-заготовки под геометрию кривых и миниатюру без бизнес-UI
 
-- [ ] T001 Create `handwritingocr.client/src/curvePoints.ts` with exported types/helpers stubs: `CurvePoints`, `isWordVectorized`, `filterValidCurves` (empty implementations / TODO bodies ok)
-- [ ] T002 [P] Create stub component `handwritingocr.client/src/WordCurveThumbnail.tsx` that accepts `curvePoints` prop and returns `null` (or empty placeholder `<svg>`)
-- [ ] T003 [P] Add CSS placeholders for words table / thumbnail cell in `handwritingocr.client/src/App.css` (e.g. `.words-table`, `.word-curve-thumb`) without wiring into JSX yet
+- [X] T001 Create `handwritingocr.client/src/curvePoints.ts` with exported types/helpers stubs: `CurvePoints`, `isWordVectorized`, `filterValidCurves` (empty implementations / TODO bodies ok)
+- [X] T002 [P] Create stub component `handwritingocr.client/src/WordCurveThumbnail.tsx` that accepts `curvePoints` prop and returns `null` (or empty placeholder `<svg>`)
+- [X] T003 [P] Add CSS placeholders for words table / thumbnail cell in `handwritingocr.client/src/App.css` (e.g. `.words-table`, `.word-curve-thumb`) without wiring into JSX yet
 
 ---
 
@@ -36,9 +36,9 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T004 Extend `Word` interface in `handwritingocr.client/src/App.tsx` with optional `curvePoints?: number[][][] | null` per `specs/002-words-vector-ui/contracts/words-list-ui.md` and `data-model.md`
-- [ ] T005 Implement validation helpers in `handwritingocr.client/src/curvePoints.ts`: treat vectorized iff non-empty array after filtering curves with exactly 4 points × 2 finite numbers; export `isWordVectorized(word)` / `filterValidCurves(curvePoints)`
-- [ ] T006 Confirm `fetchWords` in `handwritingocr.client/src/App.tsx` keeps full JSON Word objects (including `curvePoints` when present) without stripping unknown fields; fix typing/`JSON.parse` path if anything drops the field
+- [X] T004 Extend `Word` interface in `handwritingocr.client/src/App.tsx` with optional `curvePoints?: number[][][] | null` per `specs/002-words-vector-ui/contracts/words-list-ui.md` and `data-model.md`
+- [X] T005 Implement validation helpers in `handwritingocr.client/src/curvePoints.ts`: treat vectorized iff non-empty array after filtering curves with exactly 4 points × 2 finite numbers; export `isWordVectorized(word)` / `filterValidCurves(curvePoints)`
+- [X] T006 Confirm `fetchWords` in `handwritingocr.client/src/App.tsx` keeps full JSON Word objects (including `curvePoints` when present) without stripping unknown fields; fix typing/`JSON.parse` path if anything drops the field
 
 **Checkpoint**: После `GET …/words` в state есть `curvePoints`; статус векторизации вычислим без UI таблицы
 
@@ -52,10 +52,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Add section «Слова скана» in `handwritingocr.client/src/App.tsx`: show loading / empty («Нет слов») / error states based on `words` and existing fetch flow when `scanId` is set
-- [ ] T008 [US1] Render HTML table (or equivalent columnar list) of current `words` in `handwritingocr.client/src/App.tsx` with columns Текст | Статус | Миниатюра | Действие; status via `isWordVectorized` from `curvePoints.ts` (RU labels); Миниатюра/Действие may be «—» until US2/US3
-- [ ] T009 [US1] Style the words table in `handwritingocr.client/src/App.css` so it is visually separate from the scan image overlay (no absolute positioning over the scan `<img>`)
-- [ ] T010 [US1] Ensure switching/clearing scan clears or replaces the words table consistently with existing `setWords(null)` reset paths in `handwritingocr.client/src/App.tsx` (no ghost rows from previous scan)
+- [X] T007 [US1] Add section «Слова скана» in `handwritingocr.client/src/App.tsx`: show loading / empty («Нет слов») / error states based on `words` and existing fetch flow when `scanId` is set
+- [X] T008 [US1] Render HTML table (or equivalent columnar list) of current `words` in `handwritingocr.client/src/App.tsx` with columns Текст | Статус | Миниатюра | Действие; status via `isWordVectorized` from `curvePoints.ts` (RU labels); Миниатюра/Действие may be «—» until US2/US3
+- [X] T009 [US1] Style the words table in `handwritingocr.client/src/App.css` so it is visually separate from the scan image overlay (no absolute positioning over the scan `<img>`)
+- [X] T010 [US1] Ensure switching/clearing scan clears or replaces the words table consistently with existing `setWords(null)` reset paths in `handwritingocr.client/src/App.tsx` (no ghost rows from previous scan)
 
 **Checkpoint**: MVP — оператор видит слова и статусы без ручного API
 
@@ -69,10 +69,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T011 [P] [US2] Implement bbox + SVG path `d` builders in `handwritingocr.client/src/curvePoints.ts` (min/max over control points of valid curves; padding; cubic `M`/`C` segments; guard zero-size bbox)
-- [ ] T012 [US2] Implement `WordCurveThumbnail` in `handwritingocr.client/src/WordCurveThumbnail.tsx`: render `<svg viewBox={bbox}>` with paths; return null/placeholder if no valid curves; fixed CSS size via `App.css` class
-- [ ] T013 [US2] Wire `WordCurveThumbnail` into the Миниатюра column in `handwritingocr.client/src/App.tsx` only when `isWordVectorized(word)`; never draw these paths on the scan overlay SVG
-- [ ] T014 [US2] Harden thumbnail styles in `handwritingocr.client/src/App.css` (compact cell, overflow hidden, distinct from scan overlay) so FR-005/FR-006 stay obvious in UI
+- [X] T011 [P] [US2] Implement bbox + SVG path `d` builders in `handwritingocr.client/src/curvePoints.ts` (min/max over control points of valid curves; padding; cubic `M`/`C` segments; guard zero-size bbox)
+- [X] T012 [US2] Implement `WordCurveThumbnail` in `handwritingocr.client/src/WordCurveThumbnail.tsx`: render `<svg viewBox={bbox}>` with paths; return null/placeholder if no valid curves; fixed CSS size via `App.css` class
+- [X] T013 [US2] Wire `WordCurveThumbnail` into the Миниатюра column in `handwritingocr.client/src/App.tsx` only when `isWordVectorized(word)`; never draw these paths on the scan overlay SVG
+- [X] T014 [US2] Harden thumbnail styles in `handwritingocr.client/src/App.css` (compact cell, overflow hidden, distinct from scan overlay) so FR-005/FR-006 stay obvious in UI
 
 **Checkpoint**: Миниатюры читаемы и отделены от изображения скана
 
@@ -86,11 +86,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T015 [US3] Add UI state in `handwritingocr.client/src/App.tsx`: `vectorizingWordId` (`number | null`) and `vectorizeStatus` / error string (`string | null`)
-- [ ] T016 [US3] Implement `vectorizeWord(scanId, wordId)` fetch helper in `handwritingocr.client/src/App.tsx` (or small adjacent module): `POST /api/Scans/{scanId}/words/{wordId}/vectorize`, no body; on `!ok` throw/return `await response.text()`; on ok parse JSON `Word`
-- [ ] T017 [US3] On success, replace the matching word in `words` by `id` with response payload (including `curvePoints`); sync the same `curvePoints` onto the matching word object inside `layoutLines` without resetting line order
-- [ ] T018 [US3] On failure, set RU error message for the operator and do **not** clear existing `curvePoints` / thumbnail state for that word in `handwritingocr.client/src/App.tsx`
-- [ ] T019 [US3] Render «Векторизовать» button in the Действие column of the words table in `handwritingocr.client/src/App.tsx`: hidden or disabled for `id === 0`; `disabled` while `vectorizingWordId === word.id`; wire click to T016–T018
+- [X] T015 [US3] Add UI state in `handwritingocr.client/src/App.tsx`: `vectorizingWordId` (`number | null`) and `vectorizeStatus` / error string (`string | null`)
+- [X] T016 [US3] Implement `vectorizeWord(scanId, wordId)` fetch helper in `handwritingocr.client/src/App.tsx` (or small adjacent module): `POST /api/Scans/{scanId}/words/{wordId}/vectorize`, no body; on `!ok` throw/return `await response.text()`; on ok parse JSON `Word`
+- [X] T017 [US3] On success, replace the matching word in `words` by `id` with response payload (including `curvePoints`); sync the same `curvePoints` onto the matching word object inside `layoutLines` without resetting line order
+- [X] T018 [US3] On failure, set RU error message for the operator and do **not** clear existing `curvePoints` / thumbnail state for that word in `handwritingocr.client/src/App.tsx`
+- [X] T019 [US3] Render «Векторизовать» button in the Действие column of the words table in `handwritingocr.client/src/App.tsx`: hidden or disabled for `id === 0`; `disabled` while `vectorizingWordId === word.id`; wire click to T016–T018
 
 **Checkpoint**: Полный цикл просмотр → векторизация → обновление превью на клиенте
 
@@ -100,9 +100,9 @@
 
 **Purpose**: Согласованность UX и приёмка по quickstart
 
-- [ ] T020 [P] Review RU copy (статусы, кнопка, пустой список, ошибки) in `handwritingocr.client/src/App.tsx` for consistency with existing App messages
-- [ ] T021 Verify no vector paths are drawn on the scan image overlay in `handwritingocr.client/src/App.tsx` (scope: no overlay / no batch / no curve edit UI)
-- [ ] T022 Run manual validation scenarios from `specs/002-words-vector-ui/quickstart.md` §§1–6 against running SPA+API
+- [X] T020 [P] Review RU copy (статусы, кнопка, пустой список, ошибки) in `handwritingocr.client/src/App.tsx` for consistency with existing App messages
+- [X] T021 Verify no vector paths are drawn on the scan image overlay in `handwritingocr.client/src/App.tsx` (scope: no overlay / no batch / no curve edit UI)
+- [X] T022 Run manual validation scenarios from `specs/002-words-vector-ui/quickstart.md` §§1–6 against running SPA+API
 
 ---
 
