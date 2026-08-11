@@ -12,17 +12,20 @@ namespace handwritingOCR.Server.Controllers
         private readonly ScanDbService _scanDbService;
         private readonly WordDbService _wordDbService;
         private readonly YandexOcrService _yandexOcrService;
+        private readonly WordVectorizationService _wordVectorizationService;
 
         public ScansController(
             FileStorageService fileStorageService,
             ScanDbService scanDbService,
             WordDbService wordDbService,
-            YandexOcrService yandexOcrService)
+            YandexOcrService yandexOcrService,
+            WordVectorizationService wordVectorizationService)
         {
             _fileStorageService = fileStorageService;
             _scanDbService = scanDbService;
             _wordDbService = wordDbService;
             _yandexOcrService = yandexOcrService;
+            _wordVectorizationService = wordVectorizationService;
         }
 
         // Метод для загрузки файлов изображений на сервер
@@ -143,6 +146,28 @@ namespace handwritingOCR.Server.Controllers
             if (!deleted) return NotFound("Слово не найдено");
 
             return NoContent();
+        }
+
+        [HttpPost("{id}/words/{wordId}/vectorize")]
+        public async Task<IActionResult> VectorizeWord(int id, int wordId)
+        {
+            try
+            {
+                var word = await _wordVectorizationService.VectorizeAsync(id, wordId);
+                return Ok(word);
+            }
+            catch (ResourceNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, ex.Message);
+            }
         }
 
         // Результат распознавания полностью заменяет прежние слова скана:

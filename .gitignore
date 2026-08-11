@@ -17,3 +17,12 @@ handwritingOCR.Server/appsettings.Development.json
 
 .vs/
 .vscode/
+.idea/
+
+# Universal junk / secrets
+*.log
+.env*
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp

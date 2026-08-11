@@ -24,10 +24,10 @@
 
 **Purpose**: Зависимости, папки и конфигурация без бизнес-логики векторизации
 
-- [ ] T001 Add NuGet package SixLabors.ImageSharp to `handwritingOCR.Server/handwritingOCR.Server.csproj`
-- [ ] T002 [P] Create `handwritingOCR.Server/Options/WordVectorizationOptions.cs` with `PaddingPx` (≥ 0) and `ApproximationTolerance` (> 0)
-- [ ] T003 [P] Add `WordVectorization` section with defaults (`PaddingPx`: 4, `ApproximationTolerance`: 1.5) to `handwritingOCR.Server/appsettings.json` and `handwritingOCR.Server/appsettings.Development.json`
-- [ ] T004 [P] Create empty stubs `handwritingOCR.Server/Imaging/WordFragmentExtractor.cs` and `handwritingOCR.Server/Imaging/StrokeBezierFitter.cs` (namespaces only / class shells)
+- [X] T001 Add NuGet package SixLabors.ImageSharp to `handwritingOCR.Server/handwritingOCR.Server.csproj`
+- [X] T002 [P] Create `handwritingOCR.Server/Options/WordVectorizationOptions.cs` with `PaddingPx` (≥ 0) and `ApproximationTolerance` (> 0)
+- [X] T003 [P] Add `WordVectorization` section with defaults (`PaddingPx`: 4, `ApproximationTolerance`: 1.5) to `handwritingOCR.Server/appsettings.json` and `handwritingOCR.Server/appsettings.Development.json`
+- [X] T004 [P] Create empty stubs `handwritingOCR.Server/Imaging/WordFragmentExtractor.cs` and `handwritingOCR.Server/Imaging/StrokeBezierFitter.cs` (namespaces only / class shells)
 
 ---
 
@@ -37,13 +37,13 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T005 Add Liquibase changeset to `liquibase/changelog.sql`: `ALTER TABLE words ADD COLUMN curve_points real[]` with `--rollback alter table words drop column curve_points`
-- [ ] T006 Add nullable property `float[,,]? CurvePoints` to `handwritingOCR.Server/Models/Word.cs` (JSON camelCase `curvePoints`)
-- [ ] T007 Extend `LoadWordsAsync` / `ReadWord` in `handwritingOCR.Server/Services/WordDbService.cs` to SELECT and map `curve_points` into `Word.CurvePoints` (`float[,,]?`, NULL → null)
-- [ ] T007b Add `handwritingOCR.Server/Serialization/Float3DJsonConverter.cs` (`JsonConverter<float[,,]>`: `Write` serializes to nested JSON array `[[[x,y],...],...]`; `Read` is not required — the value is written to the DB via an Npgsql parameter, never deserialized from a JSON request body). Register the converter once in `handwritingOCR.Server/Program.cs` via `AddControllers().AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new Float3DJsonConverter()))`. `Word.CurvePoints` stays `float[,,]?` everywhere; the converter transparently covers every action that serializes `Word` with a non-null value (including the existing `GetWords`), not just the future vectorize endpoint — required as soon as T007 makes reading a non-null `curve_points` value possible.
-- [ ] T008 Add `GetWordAsync(int scanId, int wordId)` to `handwritingOCR.Server/Services/WordDbService.cs` returning `Word?` (null if missing or wrong scan)
-- [ ] T009 Add `UpdateCurvePointsAsync(int scanId, int wordId, float[,,] curvePoints)` to `handwritingOCR.Server/Services/WordDbService.cs`: explicit transaction, single UPDATE of `curve_points` only after non-empty `N×4×2` array; return updated `Word?`; never write empty array
-- [ ] T010 Register `IOptions<WordVectorizationOptions>` (or `Configure<WordVectorizationOptions>`) in `handwritingOCR.Server/Program.cs`
+- [X] T005 Add Liquibase changeset to `liquibase/changelog.sql`: `ALTER TABLE words ADD COLUMN curve_points real[]` with `--rollback alter table words drop column curve_points`
+- [X] T006 Add nullable property `float[,,]? CurvePoints` to `handwritingOCR.Server/Models/Word.cs` (JSON camelCase `curvePoints`)
+- [X] T007 Extend `LoadWordsAsync` / `ReadWord` in `handwritingOCR.Server/Services/WordDbService.cs` to SELECT and map `curve_points` into `Word.CurvePoints` (`float[,,]?`, NULL → null)
+- [X] T007b Add `handwritingOCR.Server/Serialization/Float3DJsonConverter.cs` (`JsonConverter<float[,,]>`: `Write` serializes to nested JSON array `[[[x,y],...],...]`; `Read` is not required — the value is written to the DB via an Npgsql parameter, never deserialized from a JSON request body). Register the converter once in `handwritingOCR.Server/Program.cs` via `AddControllers().AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new Float3DJsonConverter()))`. `Word.CurvePoints` stays `float[,,]?` everywhere; the converter transparently covers every action that serializes `Word` with a non-null value (including the existing `GetWords`), not just the future vectorize endpoint — required as soon as T007 makes reading a non-null `curve_points` value possible.
+- [X] T008 Add `GetWordAsync(int scanId, int wordId)` to `handwritingOCR.Server/Services/WordDbService.cs` returning `Word?` (null if missing or wrong scan)
+- [X] T009 Add `UpdateCurvePointsAsync(int scanId, int wordId, float[,,] curvePoints)` to `handwritingOCR.Server/Services/WordDbService.cs`: explicit transaction, single UPDATE of `curve_points` only after non-empty `N×4×2` array; return updated `Word?`; never write empty array
+- [X] T010 Register `IOptions<WordVectorizationOptions>` (or `Configure<WordVectorizationOptions>`) in `handwritingOCR.Server/Program.cs`
 
 **Checkpoint**: Миграция готова; слова читаются с `curvePoints`; UPDATE вектора доступен из сервиса
 
@@ -57,11 +57,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Implement perspective crop with configurable padding and image-bounds clip in `handwritingOCR.Server/Imaging/WordFragmentExtractor.cs` (input: scan bytes + X1..Y4 + `PaddingPx`; output: aligned fragment; before padding: reject degenerate quad — area < 1.0 px² or any edge < 1.0 px — with RU «вырожденная рамка…»; reject empty/near-empty intersection of raw quad with image bounds — intersection area < 1.0 px² — with distinct RU «рамка слова не пересекается с изображением скана»; then apply padding and clip to image bounds without rejecting reduced padding at edges or post-clip fragment size; see research.md §2a)
-- [ ] T012 [P] [US1] Implement binarize → Zhang–Suen (or equivalent) skeleton → polyline trace → cubic Bézier fit with `ApproximationTolerance` in `handwritingOCR.Server/Imaging/StrokeBezierFitter.cs`; return `float[,,]` shaped `N×4×2`; throw `ArgumentException` if zero strokes/curves
-- [ ] T013 [US1] Implement orchestration in `handwritingOCR.Server/Services/WordVectorizationService.cs`: validate options (invalid → `InvalidOperationException`); load word + scan path; load file via `FileStorageService`; extract → fit → `UpdateCurvePointsAsync`; do not call UPDATE on failure
-- [ ] T014 [US1] Register scoped `WordVectorizationService` in `handwritingOCR.Server/Program.cs`
-- [ ] T015 [US1] Add `POST {id}/words/{wordId}/vectorize` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/001-word-stroke-vector/contracts/vectorize-word.md`: thin controller; `200` + Word JSON; map missing scan/word/file → `404` plain text RU; `ArgumentException` → `400`; `InvalidOperationException` → `503`
+- [X] T011 [US1] Implement perspective crop with configurable padding and image-bounds clip in `handwritingOCR.Server/Imaging/WordFragmentExtractor.cs` (input: scan bytes + X1..Y4 + `PaddingPx`; output: aligned fragment; before padding: reject degenerate quad — area < 1.0 px² or any edge < 1.0 px — with RU «вырожденная рамка…»; reject empty/near-empty intersection of raw quad with image bounds — intersection area < 1.0 px² — with distinct RU «рамка слова не пересекается с изображением скана»; then apply padding and clip to image bounds without rejecting reduced padding at edges or post-clip fragment size; see research.md §2a)
+- [X] T012 [P] [US1] Implement binarize → Zhang–Suen (or equivalent) skeleton → polyline trace → cubic Bézier fit with `ApproximationTolerance` in `handwritingOCR.Server/Imaging/StrokeBezierFitter.cs`; return `float[,,]` shaped `N×4×2`; throw `ArgumentException` if zero strokes/curves
+- [X] T013 [US1] Implement orchestration in `handwritingOCR.Server/Services/WordVectorizationService.cs`: validate options (invalid → `InvalidOperationException`); load word + scan path; load file via `FileStorageService`; extract → fit → `UpdateCurvePointsAsync`; do not call UPDATE on failure
+- [X] T014 [US1] Register scoped `WordVectorizationService` in `handwritingOCR.Server/Program.cs`
+- [X] T015 [US1] Add `POST {id}/words/{wordId}/vectorize` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/001-word-stroke-vector/contracts/vectorize-word.md`: thin controller; `200` + Word JSON; map missing scan/word/file → `404` plain text RU; `ArgumentException` → `400`; `InvalidOperationException` → `503`
 
 **Checkpoint**: Happy-path векторизация работает end-to-end — MVP
 
@@ -75,10 +75,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Harden file/decode failures in `handwritingOCR.Server/Services/WordVectorizationService.cs`: missing file → signal for `404` «Не найден файл»; corrupt image → `ArgumentException` with RU message; never UPDATE on these paths
-- [ ] T017 [P] [US3] Ensure degenerate-quad, non-intersecting-quad, and zero-stroke outcomes only throw before persist in `handwritingOCR.Server/Imaging/WordFragmentExtractor.cs` and `handwritingOCR.Server/Imaging/StrokeBezierFitter.cs` (distinct RU messages for §2a cases 1–2 and for zero strokes; no post-clip MinFragmentSidePx / empty-after-padding reject; suitable for `400` body)
-- [ ] T018 [US3] Verify `UpdateCurvePointsAsync` in `handwritingOCR.Server/Services/WordDbService.cs` rejects empty/invalid rank arrays and commits only a full replace so failed vectorization cannot clear an existing value mid-flight
-- [ ] T019 [US3] Align exception→HTTP mapping and RU plain-text messages in `handwritingOCR.Server/Controllers/ScansController.cs` with research error table and constitution principle III
+- [X] T016 [US3] Harden file/decode failures in `handwritingOCR.Server/Services/WordVectorizationService.cs`: missing file → signal for `404` «Не найден файл»; corrupt image → `ArgumentException` with RU message; never UPDATE on these paths
+- [X] T017 [P] [US3] Ensure degenerate-quad, non-intersecting-quad, and zero-stroke outcomes only throw before persist in `handwritingOCR.Server/Imaging/WordFragmentExtractor.cs` and `handwritingOCR.Server/Imaging/StrokeBezierFitter.cs` (distinct RU messages for §2a cases 1–2 and for zero strokes; no post-clip MinFragmentSidePx / empty-after-padding reject; suitable for `400` body)
+- [X] T018 [US3] Verify `UpdateCurvePointsAsync` in `handwritingOCR.Server/Services/WordDbService.cs` rejects empty/invalid rank arrays and commits only a full replace so failed vectorization cannot clear an existing value mid-flight
+- [X] T019 [US3] Align exception→HTTP mapping and RU plain-text messages in `handwritingOCR.Server/Controllers/ScansController.cs` with research error table and constitution principle III
 
 **Checkpoint**: Негативные сценарии стабильны; данные слова не портятся
 
@@ -92,9 +92,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] Confirm/adjust `UpdateCurvePointsAsync` in `handwritingOCR.Server/Services/WordDbService.cs` so successful re-vectorize is a single full-column UPDATE (replace), not append or second row
-- [ ] T021 [US2] Ensure `WordVectorizationService` in `handwritingOCR.Server/Services/WordVectorizationService.cs` computes the full new `float[,,]` before any DB write so a failed second attempt leaves prior `curve_points` unchanged
-- [ ] T022 [US2] Smoke-check via endpoint in `handwritingOCR.Server/Controllers/ScansController.cs` / manual quickstart §2: response always returns the latest full `curvePoints` after success
+- [X] T020 [US2] Confirm/adjust `UpdateCurvePointsAsync` in `handwritingOCR.Server/Services/WordDbService.cs` so successful re-vectorize is a single full-column UPDATE (replace), not append or second row
+- [X] T021 [US2] Ensure `WordVectorizationService` in `handwritingOCR.Server/Services/WordVectorizationService.cs` computes the full new `float[,,]` before any DB write so a failed second attempt leaves prior `curve_points` unchanged
+- [X] T022 [US2] Smoke-check via endpoint in `handwritingOCR.Server/Controllers/ScansController.cs` / manual quickstart §2: response always returns the latest full `curvePoints` after success
 
 **Checkpoint**: US1 + US3 + US2 выполняются независимо по критериям quickstart
 
@@ -104,9 +104,9 @@
 
 **Purpose**: Сквозная проверка и мелкая подчистка
 
-- [ ] T023 [P] Run through all scenarios in `specs/001-word-stroke-vector/quickstart.md` and fix gaps against `contracts/vectorize-word.md`
-- [ ] T024 [P] Add brief «почему» comments only for non-obvious invariants (3D `curve_points` layout, no partial UPDATE, fragment-relative coords) in touched files under `handwritingOCR.Server/`
-- [ ] T025 Confirm `GET /api/Scans/{id}/words` serialization of `curvePoints` (`null` vs `N×4×2`) matches `specs/001-word-stroke-vector/data-model.md`
+- [X] T023 [P] Run through all scenarios in `specs/001-word-stroke-vector/quickstart.md` and fix gaps against `contracts/vectorize-word.md`
+- [X] T024 [P] Add brief «почему» comments only for non-obvious invariants (3D `curve_points` layout, no partial UPDATE, fragment-relative coords) in touched files under `handwritingOCR.Server/`
+- [X] T025 Confirm `GET /api/Scans/{id}/words` serialization of `curvePoints` (`null` vs `N×4×2`) matches `specs/001-word-stroke-vector/data-model.md`
 
 ---
 
