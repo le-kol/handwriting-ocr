@@ -175,6 +175,42 @@ function vectorizeWord(scanId: number, wordId: number): Promise<Word> {
     });
 }
 
+function deleteWord(scanId: number, wordId: number): Promise<void> {
+    return fetch("/api/Scans/" + scanId + "/words/" + wordId, {
+        method: "DELETE",
+    }).then(function (response) {
+        if (!response.ok) {
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
+        }
+    });
+}
+
+function vectorizeBatch(scanId: number): Promise<Word[]> {
+    return fetch("/api/Scans/" + scanId + "/vectorize-batch", {
+        method: "POST",
+    }).then(function (response) {
+        if (!response.ok) {
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
+        }
+        return response.json() as Promise<Word[]>;
+    });
+}
+
+function removeWordFromLayout(lines: Word[][] | null, wordId: number): Word[][] | null {
+    if (!lines) {
+        return lines;
+    }
+    return lines
+        .map(function (line) {
+            return line.filter(function (word) { return word.id !== wordId; });
+        })
+        .filter(function (line) { return line.length > 0; });
+}
+
 function readError(response: Response): Promise<never> {
     return response.text().then(function (message) {
         throw new Error(message || String(response.status));
@@ -214,7 +250,9 @@ function App() {
     const [draggedWordId, setDraggedWordId] = useState<number | null>(null);
     const [dropTarget, setDropTarget] = useState<{ lineIndex: number; positionInLine: number } | null>(null);
     const [vectorizingWordId, setVectorizingWordId] = useState<number | null>(null);
+    const [isBatchVectorizing, setIsBatchVectorizing] = useState(false);
     const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null);
+    const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
 
     function syncLayoutFromWords(list: Word[]) {
         const layout = buildLayoutFromWords(list);
@@ -244,7 +282,9 @@ function App() {
         setDraggedWordId(null);
         setDropTarget(null);
         setVectorizingWordId(null);
+        setIsBatchVectorizing(false);
         setVectorizeStatus(null);
+        setDeleteStatus(null);
 
         if (file) {
             // Запрос для отправки файла на сервер
@@ -290,7 +330,9 @@ function App() {
             setSaveStatus(null);
             setLayoutSaveStatus(null);
             setVectorizingWordId(null);
+            setIsBatchVectorizing(false);
             setVectorizeStatus(null);
+            setDeleteStatus(null);
             setRecognizeStatus("Распознавание завершено, слов: " + data.length);
         }).catch(function (error) {
             setRecognizeStatus("Ошибка распознавания: " + error.message);
@@ -300,7 +342,7 @@ function App() {
     }
 
     function handleVectorizeClick(word: Word) {
-        if (scanId === null || word.id === 0 || vectorizingWordId !== null) {
+        if (scanId === null || word.id === 0 || vectorizingWordId !== null || isBatchVectorizing) {
             return;
         }
 
@@ -334,6 +376,59 @@ function App() {
         });
     }
 
+    function handleDeleteClick() {
+        if (scanId === null || draft === null || draft.id === 0) {
+            return;
+        }
+
+        const wordId = draft.id;
+        setDeleteStatus(null);
+
+        deleteWord(scanId, wordId).then(function () {
+            setWords(function (current) {
+                if (!current) {
+                    return current;
+                }
+                return current.filter(function (item) { return item.id !== wordId; });
+            });
+            setLayoutLines(function (lines) {
+                return removeWordFromLayout(lines, wordId);
+            });
+            setDraft(null);
+            setDraggedWordId(null);
+            setDropTarget(null);
+            setDeleteStatus(null);
+        }).catch(function (error) {
+            setDeleteStatus(error.message);
+        });
+    }
+
+    function handleBatchVectorizeClick() {
+        if (scanId === null || isBatchVectorizing || vectorizingWordId !== null) {
+            return;
+        }
+
+        setIsBatchVectorizing(true);
+        setVectorizeStatus("Пакетная векторизация…");
+
+        vectorizeBatch(scanId).then(function (data) {
+            setWords(data);
+            syncLayoutFromWords(data);
+            setDraft(function (current) {
+                if (!current) {
+                    return current;
+                }
+                const updated = data.find(function (item) { return item.id === current.id; });
+                return updated ? { ...current, ...updated } : current;
+            });
+            setVectorizeStatus("Пакетная векторизация завершена");
+        }).catch(function (error) {
+            setVectorizeStatus("Ошибка пакетной векторизации: " + error.message);
+        }).finally(function () {
+            setIsBatchVectorizing(false);
+        });
+    }
+
     // Размеры скана в БД не хранятся, поэтому берём их у загруженного изображения:
     // координаты рамок заданы именно в этих пикселях
     function handleImageLoad(event: React.SyntheticEvent<HTMLImageElement>) {
@@ -348,6 +443,7 @@ function App() {
         if (draft && draft.id === word.id) return;
         setDraft({ ...word });
         setSaveStatus(null);
+        setDeleteStatus(null);
     }
 
     // Слово создаётся не сразу: кнопка только открывает пустую форму, а запись
@@ -639,11 +735,31 @@ function App() {
                             );
                         })}
                     </div>
+                    {isWordVectorized(draft) ? (
+                        <WordCurveThumbnail curvePoints={draft.curvePoints} />
+                    ) : null}
+                    <div className="editor-actions">
+                        {draft.id > 0 && !isWordVectorized(draft) ? (
+                            <button
+                                type="button"
+                                onClick={function () { handleVectorizeClick(draft); }}
+                                disabled={vectorizingWordId === draft.id || isBatchVectorizing}
+                            >
+                                {vectorizingWordId === draft.id ? "Векторизация…" : "Векторизовать"}
+                            </button>
+                        ) : null}
+                        {draft.id > 0 ? (
+                            <button type="button" onClick={handleDeleteClick}>
+                                Удалить слово
+                            </button>
+                        ) : null}
+                    </div>
                     <button type="button" onClick={handleSaveClick} disabled={isSaving}>
                         {isSaving ? "Сохранение..." : "Сохранить"}
                     </button>
                     <button type="button" onClick={handleCancelClick}>Отмена</button>
                     <p>{saveStatus}</p>
+                    {deleteStatus ? <p>{deleteStatus}</p> : null}
                 </div>
             ) : null}
             {displayLines && displayLines.length > 0 ? (
@@ -656,7 +772,15 @@ function App() {
                         >
                             {isSavingLayout ? "Сохранение..." : "Сохранить порядок"}
                         </button>
+                        <button
+                            type="button"
+                            onClick={handleBatchVectorizeClick}
+                            disabled={isBatchVectorizing || vectorizingWordId !== null}
+                        >
+                            {isBatchVectorizing ? "Пакетная векторизация…" : "Векторизовать все слова"}
+                        </button>
                         <p>{layoutSaveStatus}</p>
+                        {vectorizeStatus ? <p>{vectorizeStatus}</p> : null}
                     </div>
                     <div className="recognized-text">
                     {displayLines.map(function (lineWords, lineIndex) {
@@ -675,6 +799,9 @@ function App() {
                                     const isDropTarget = dropTarget !== null &&
                                         dropTarget.lineIndex === lineIndex &&
                                         dropTarget.positionInLine === positionInLine;
+                                    const vectorizationClass = isWordVectorized(word)
+                                        ? " vectorized"
+                                        : " not-vectorized";
 
                                     return (
                                         <span key={word.id}>
@@ -682,6 +809,7 @@ function App() {
                                             <span
                                                 className={
                                                     "word" +
+                                                    vectorizationClass +
                                                     (isSelected ? " selected" : "") +
                                                     (isDragging ? " dragging" : "") +
                                                     (isDropTarget ? " drop-target" : "")
@@ -707,67 +835,6 @@ function App() {
                     })}
                     </div>
                 </div>
-            ) : null}
-            {scanId ? (
-                <section className="words-section" aria-label="Слова скана">
-                    <h2>Слова скана</h2>
-                    {isRecognizing ? (
-                        <p className="words-section-status">Загрузка слов…</p>
-                    ) : words === null ? (
-                        <p className="words-section-status">
-                            Слова появятся после распознавания или загрузки списка
-                        </p>
-                    ) : words.length === 0 ? (
-                        <p className="words-section-status">Нет слов</p>
-                    ) : (
-                        <table className="words-table">
-                            <thead>
-                                <tr>
-                                    <th>Текст</th>
-                                    <th>Статус</th>
-                                    <th>Миниатюра</th>
-                                    <th>Действие</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {words.map(function (word) {
-                                    const vectorized = isWordVectorized(word);
-                                    return (
-                                        <tr key={word.id === 0 ? "draft-" + word.orderIndex : word.id}>
-                                            <td>{word.text || (word.id === 0 ? "…" : "")}</td>
-                                            <td>
-                                                {vectorized ? "Векторизовано" : "Не векторизовано"}
-                                            </td>
-                                            <td className="word-curve-cell">
-                                                {vectorized
-                                                    ? <WordCurveThumbnail curvePoints={word.curvePoints} />
-                                                    : "—"}
-                                            </td>
-                                            <td>
-                                                {word.id === 0 ? (
-                                                    "—"
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={function () { handleVectorizeClick(word); }}
-                                                        disabled={vectorizingWordId === word.id}
-                                                    >
-                                                        {vectorizingWordId === word.id
-                                                            ? "Векторизация…"
-                                                            : "Векторизовать"}
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                    {vectorizeStatus ? (
-                        <p className="words-section-status">{vectorizeStatus}</p>
-                    ) : null}
-                </section>
             ) : null}
         </div>
     );

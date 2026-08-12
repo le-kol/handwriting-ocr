@@ -24,7 +24,7 @@
 
 **Purpose**: Подтвердить brownfield-зависимости от фич 002/003 перед рефакторингом UI
 
-- [ ] T001 Confirm prerequisites in `handwritingocr.client/src/`: `curvePoints.ts` (`isWordVectorized`), `WordCurveThumbnail.tsx`, `vectorizeWord` helper and `handleVectorizeClick` in `App.tsx`, and server `POST /api/Scans/{id}/vectorize-batch` (003) per `specs/004-unified-words-view/plan.md`
+- [X] T001 Confirm prerequisites in `handwritingocr.client/src/`: `curvePoints.ts` (`isWordVectorized`), `WordCurveThumbnail.tsx`, `vectorizeWord` helper and `handleVectorizeClick` in `App.tsx`, and server `POST /api/Scans/{id}/vectorize-batch` (003) per `specs/004-unified-words-view/plan.md`
 
 ---
 
@@ -34,10 +34,10 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 Implement `removeWordFromLayout(lines, wordId)` pure helper in `handwritingocr.client/src/App.tsx` (filter word from all lines, drop empty lines)
-- [ ] T003 Implement `deleteWord(scanId, wordId)` fetch helper in `handwritingocr.client/src/App.tsx`: `DELETE /api/Scans/{scanId}/words/{wordId}`; success on `204`; on `!ok` throw `Error(await response.text())`
-- [ ] T004 Implement `vectorizeBatch(scanId)` fetch helper in `handwritingocr.client/src/App.tsx`: `POST /api/Scans/{scanId}/vectorize-batch`; on ok parse JSON `Word[]`; on `!ok` throw via `response.text()`
-- [ ] T005 Add UI state in `handwritingocr.client/src/App.tsx`: `isBatchVectorizing` (boolean), `deleteStatus` (`string | null`); reset both in existing scan/file/recognize reset paths alongside `vectorizingWordId` / `vectorizeStatus`
+- [X] T002 Implement `removeWordFromLayout(lines, wordId)` pure helper in `handwritingocr.client/src/App.tsx` (filter word from all lines, drop empty lines)
+- [X] T003 Implement `deleteWord(scanId, wordId)` fetch helper in `handwritingocr.client/src/App.tsx`: `DELETE /api/Scans/{scanId}/words/{wordId}`; success on `204`; on `!ok` throw `Error(await response.text())`
+- [X] T004 Implement `vectorizeBatch(scanId)` fetch helper in `handwritingocr.client/src/App.tsx`: `POST /api/Scans/{scanId}/vectorize-batch`; on ok parse JSON `Word[]`; on `!ok` throw via `response.text()`
+- [X] T005 Add UI state in `handwritingocr.client/src/App.tsx`: `isBatchVectorizing` (boolean), `deleteStatus` (`string | null`); reset both in existing scan/file/recognize reset paths alongside `vectorizingWordId` / `vectorizeStatus`
 
 **Checkpoint**: Хелперы delete/batch и state готовы; UI stories можно подключать
 
@@ -51,10 +51,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Remove entire `words-section` / `words-table` JSX block from `handwritingocr.client/src/App.tsx` (including table «Векторизовать» column and `words-section-status` for vectorize-only messages — relocate status display in later phases)
-- [ ] T007 [US1] Add vectorization status CSS classes on each `.word` span in recognized-text in `handwritingocr.client/src/App.tsx`: append `vectorized` or `not-vectorized` via `isWordVectorized(word)` without modifying `shown.text` inner content
-- [ ] T008 [P] [US1] Add `.word.vectorized` and `.word.not-vectorized` decorative indicator styles in `handwritingocr.client/src/App.css` (e.g. border/underline/`::after` dot); MUST NOT inject characters into word text
-- [ ] T009 [US1] Remove unused `.words-section`, `.words-table`, `.words-table th/td`, `.word-curve-cell` rules from `handwritingocr.client/src/App.css`; retain `.word-curve-thumb` if still used by `WordCurveThumbnail`
+- [X] T006 [US1] Remove entire `words-section` / `words-table` JSX block from `handwritingocr.client/src/App.tsx` (including table «Векторизовать» column and `words-section-status` for vectorize-only messages — relocate status display in later phases)
+- [X] T007 [US1] Add vectorization status CSS classes on each `.word` span in recognized-text in `handwritingocr.client/src/App.tsx`: append `vectorized` or `not-vectorized` via `isWordVectorized(word)` without modifying `shown.text` inner content
+- [X] T008 [P] [US1] Add `.word.vectorized` and `.word.not-vectorized` decorative indicator styles in `handwritingocr.client/src/App.css` (e.g. border/underline/`::after` dot); MUST NOT inject characters into word text
+- [X] T009 [US1] Remove unused `.words-section`, `.words-table`, `.words-table th/td`, `.word-curve-cell` rules from `handwritingocr.client/src/App.css`; retain `.word-curve-thumb` if still used by `WordCurveThumbnail`
 
 **Checkpoint**: MVP — единое текстовое представление с индикаторами; таблица отсутствует
 
@@ -68,13 +68,13 @@
 
 ### Implementation for User Story 2
 
-- [ ] T010 [US2] Render `WordCurveThumbnail` in draft `.editor` block when `draft !== null && isWordVectorized(draft)` in `handwritingocr.client/src/App.tsx` (separate from scan overlay)
-- [ ] T011 [US2] Add «Векторизовать» button in draft `.editor` for `draft.id > 0 && !isWordVectorized(draft)` wired to `handleVectorizeClick(draft)` in `handwritingocr.client/src/App.tsx`; disabled while `vectorizingWordId === draft.id`
-- [ ] T012 [US2] Extend `handleVectorizeClick` early-return guard in `handwritingocr.client/src/App.tsx` to also block when `isBatchVectorizing === true`
-- [ ] T013 [US2] Implement `handleDeleteClick` in `handwritingocr.client/src/App.tsx`: call `deleteWord`; on success filter word from `words`, apply `removeWordFromLayout` on `layoutLines`, `setDraft(null)` if deleted id matched draft; clear drag state if needed
-- [ ] T014 [US2] Add «Удалить слово» button in draft `.editor` for `draft.id > 0` (no confirm dialog) wired to `handleDeleteClick` in `handwritingocr.client/src/App.tsx`
-- [ ] T015 [US2] On delete failure in `handleDeleteClick`, set `deleteStatus` with RU `error.message` and do **not** mutate `words`, `layoutLines`, or `draft` in `handwritingocr.client/src/App.tsx`
-- [ ] T016 [P] [US2] Add `.editor` styles for vector thumbnail and action buttons (vectorize/delete) in `handwritingocr.client/src/App.css`
+- [X] T010 [US2] Render `WordCurveThumbnail` in draft `.editor` block when `draft !== null && isWordVectorized(draft)` in `handwritingocr.client/src/App.tsx` (separate from scan overlay)
+- [X] T011 [US2] Add «Векторизовать» button in draft `.editor` for `draft.id > 0 && !isWordVectorized(draft)` wired to `handleVectorizeClick(draft)` in `handwritingocr.client/src/App.tsx`; disabled while `vectorizingWordId === draft.id`
+- [X] T012 [US2] Extend `handleVectorizeClick` early-return guard in `handwritingocr.client/src/App.tsx` to also block when `isBatchVectorizing === true`
+- [X] T013 [US2] Implement `handleDeleteClick` in `handwritingocr.client/src/App.tsx`: call `deleteWord`; on success filter word from `words`, apply `removeWordFromLayout` on `layoutLines`, `setDraft(null)` if deleted id matched draft; clear drag state if needed
+- [X] T014 [US2] Add «Удалить слово» button in draft `.editor` for `draft.id > 0` (no confirm dialog) wired to `handleDeleteClick` in `handwritingocr.client/src/App.tsx`
+- [X] T015 [US2] On delete failure in `handleDeleteClick`, set `deleteStatus` with RU `error.message` and do **not** mutate `words`, `layoutLines`, or `draft` in `handwritingocr.client/src/App.tsx`
+- [X] T016 [P] [US2] Add `.editor` styles for vector thumbnail and action buttons (vectorize/delete) in `handwritingocr.client/src/App.css`
 
 **Checkpoint**: Полный цикл правки/векторизации/удаления из draft-панели
 
@@ -88,9 +88,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T017 [US3] Implement `handleBatchVectorizeClick` in `handwritingocr.client/src/App.tsx`: guard `scanId`; set `isBatchVectorizing`; call `vectorizeBatch`; on success `setWords(data)`, `syncLayoutFromWords(data)`, merge `draft` if same id exists in response; on error set `vectorizeStatus` without replacing words/layout
-- [ ] T018 [US3] Add «Векторизовать все слова» button in `.layout-toolbar` next to «Сохранить порядок» in `handwritingocr.client/src/App.tsx`; disabled when `isBatchVectorizing` or `vectorizingWordId !== null`
-- [ ] T019 [US3] Show batch progress/success/error messages via `vectorizeStatus` near layout toolbar in `handwritingocr.client/src/App.tsx` (RU strings: «Пакетная векторизация…» / success / error prefix)
+- [X] T017 [US3] Implement `handleBatchVectorizeClick` in `handwritingocr.client/src/App.tsx`: guard `scanId`; set `isBatchVectorizing`; call `vectorizeBatch`; on success `setWords(data)`, `syncLayoutFromWords(data)`, merge `draft` if same id exists in response; on error set `vectorizeStatus` without replacing words/layout
+- [X] T018 [US3] Add «Векторизовать все слова» button in `.layout-toolbar` next to «Сохранить порядок» in `handwritingocr.client/src/App.tsx`; disabled when `isBatchVectorizing` or `vectorizingWordId !== null`
+- [X] T019 [US3] Show batch progress/success/error messages via `vectorizeStatus` near layout toolbar in `handwritingocr.client/src/App.tsx` (RU strings: «Пакетная векторизация…» / success / error prefix)
 
 **Checkpoint**: Batch из toolbar обновляет текстовые индикаторы и draft при необходимости
 
@@ -104,8 +104,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T020 [US4] Verify and fix if needed `className` composition on draggable `.word` spans in `handwritingocr.client/src/App.tsx` so `selected` / `dragging` / `drop-target` / vectorization classes coexist without breaking drag handlers
-- [ ] T021 [US4] Verify «Сохранить порядок» and content save (`handleSaveClick`) still preserve local layout order and do not regress after table removal in `handwritingocr.client/src/App.tsx`; adjust only if regression found
+- [X] T020 [US4] Verify and fix if needed `className` composition on draggable `.word` spans in `handwritingocr.client/src/App.tsx` so `selected` / `dragging` / `drop-target` / vectorization classes coexist without breaking drag handlers
+- [X] T021 [US4] Verify «Сохранить порядок» and content save (`handleSaveClick`) still preserve local layout order and do not regress after table removal in `handwritingocr.client/src/App.tsx`; adjust only if regression found
 
 **Checkpoint**: Раскладка и редактирование работают как до фичи
 
@@ -115,8 +115,8 @@
 
 **Purpose**: Согласованность UX и приёмка по quickstart
 
-- [ ] T022 [P] Review RU copy (новые кнопки, delete/batch/vectorize messages, черновик id=0) in `handwritingocr.client/src/App.tsx` for consistency with existing App messages
-- [ ] T023 Run manual validation scenarios from `specs/004-unified-words-view/quickstart.md` §§1–7 against running SPA+API
+- [X] T022 [P] Review RU copy (новые кнопки, delete/batch/vectorize messages, черновик id=0) in `handwritingocr.client/src/App.tsx` for consistency with existing App messages
+- [X] T023 Run manual validation scenarios from `specs/004-unified-words-view/quickstart.md` §§1–7 against running SPA+API
 
 ---
 
