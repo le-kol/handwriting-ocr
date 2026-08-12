@@ -52,6 +52,46 @@ namespace handwritingOCR.Server.Services
                 throw new ResourceNotFoundException("Не найден файл");
             }
 
+            return await VectorizeWordCoreAsync(word, fileBytes, scanId);
+        }
+
+        public async Task<IReadOnlyList<Word>> VectorizeBatchAsync(int scanId)
+        {
+            EnsureOptionsValid();
+
+            var path = await _scanDbService.GetScanPathAsync(scanId);
+            if (path == null)
+            {
+                throw new ResourceNotFoundException("Не найдена запись в БД");
+            }
+
+            var fileBytes = await _fileStorageService.GetFileAsync(path);
+            // Один раз читаем файл скана на весь batch — без повторного I/O на каждое слово (SC-005)
+            if (fileBytes != null)
+            {
+                var unvectorizedWords = await _wordDbService.GetUnvectorizedWordsByScanIdAsync(scanId);
+                foreach (var word in unvectorizedWords)
+                {
+                    try
+                    {
+                        await VectorizeWordCoreAsync(word, fileBytes, scanId);
+                    }
+                    catch (ArgumentException)
+                    {
+                        // FR-008: per-word сбой не прерывает batch; curve_points остаётся null
+                    }
+                    catch (ResourceNotFoundException)
+                    {
+                        // FR-008: per-word сбой не прерывает batch; curve_points остаётся null
+                    }
+                }
+            }
+
+            return await _wordDbService.GetWordsByScanIdAsync(scanId);
+        }
+
+        private async Task<Word> VectorizeWordCoreAsync(Word word, byte[] fileBytes, int scanId)
+        {
             // Полный новый вектор считаем до любой записи в БД — сбой не затирает прежний curve_points
             using var fragment = _fragmentExtractor.ExtractAlignedFragment(
                 fileBytes,
@@ -67,7 +107,7 @@ namespace handwritingOCR.Server.Services
 
             var curvePoints = _strokeBezierFitter.Fit(fragment, _options.ApproximationTolerance!.Value);
 
-            var updated = await _wordDbService.UpdateCurvePointsAsync(scanId, wordId, curvePoints);
+            var updated = await _wordDbService.UpdateCurvePointsAsync(scanId, word.Id, curvePoints);
             if (updated == null)
             {
                 throw new ResourceNotFoundException("Слово не найдено");

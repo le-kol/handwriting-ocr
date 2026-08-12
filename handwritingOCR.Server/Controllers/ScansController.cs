@@ -170,6 +170,24 @@ namespace handwritingOCR.Server.Controllers
             }
         }
 
+        [HttpPost("{id}/vectorize-batch")]
+        public async Task<IActionResult> VectorizeBatch(int id)
+        {
+            try
+            {
+                var words = await _wordVectorizationService.VectorizeBatchAsync(id);
+                return Ok(words);
+            }
+            catch (ResourceNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, ex.Message);
+            }
+        }
+
         // Результат распознавания полностью заменяет прежние слова скана:
         // повторный запуск OCR не должен смешивать новые слова со старыми
         [HttpPost("{id}/recognize")]

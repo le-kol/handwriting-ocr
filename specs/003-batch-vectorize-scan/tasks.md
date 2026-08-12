@@ -24,7 +24,7 @@
 
 **Purpose**: Убедиться, что зависимости от `001-word-stroke-vector` на месте
 
-- [ ] T001 Verify prerequisites: column `words.curve_points`, scoped `WordVectorizationService`, and valid `WordVectorization` section in `handwritingOCR.Server/appsettings.json` / `appsettings.Development.json` (single-word `POST …/vectorize` works)
+- [X] T001 Verify prerequisites: column `words.curve_points`, scoped `WordVectorizationService`, and valid `WordVectorization` section in `handwritingOCR.Server/appsettings.json` / `appsettings.Development.json` (single-word `POST …/vectorize` works)
 
 ---
 
@@ -34,9 +34,9 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 Add `GetUnvectorizedWordsByScanIdAsync(int scanId)` to `handwritingOCR.Server/Services/WordDbService.cs`: `SELECT … FROM words WHERE scan_id = @scanId AND curve_points IS NULL ORDER BY order_index`; reuse `ReadWord`
-- [ ] T003 Refactor shared per-word pipeline into private `VectorizeWordCoreAsync(Word word, byte[] fileBytes, int scanId)` in `handwritingOCR.Server/Services/WordVectorizationService.cs` (extract → fit → `UpdateCurvePointsAsync`; throws on failure as today)
-- [ ] T004 Update public `VectorizeAsync(int scanId, int wordId)` in `handwritingOCR.Server/Services/WordVectorizationService.cs` to load path/word/file and delegate to `VectorizeWordCoreAsync` without changing single-word HTTP behavior
+- [X] T002 Add `GetUnvectorizedWordsByScanIdAsync(int scanId)` to `handwritingOCR.Server/Services/WordDbService.cs`: `SELECT … FROM words WHERE scan_id = @scanId AND curve_points IS NULL ORDER BY order_index`; reuse `ReadWord`
+- [X] T003 Refactor shared per-word pipeline into private `VectorizeWordCoreAsync(Word word, byte[] fileBytes, int scanId)` in `handwritingOCR.Server/Services/WordVectorizationService.cs` (extract → fit → `UpdateCurvePointsAsync`; throws on failure as today)
+- [X] T004 Update public `VectorizeAsync(int scanId, int wordId)` in `handwritingOCR.Server/Services/WordVectorizationService.cs` to load path/word/file and delegate to `VectorizeWordCoreAsync` without changing single-word HTTP behavior
 
 **Checkpoint**: Невекторизованные слова читаются из БД; одиночная векторизация по-прежнему работает после рефакторинга
 
@@ -50,8 +50,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T005 [US1] Implement `VectorizeBatchAsync(int scanId)` in `handwritingOCR.Server/Services/WordVectorizationService.cs`: `EnsureOptionsValid()`; `GetScanPathAsync` → throw `ResourceNotFoundException` if null; load file bytes once; if bytes null skip word loop (research §2a); foreach word from `GetUnvectorizedWordsByScanIdAsync` call core inside try/catch for `ArgumentException` and `ResourceNotFoundException` (swallow, continue); return `GetWordsByScanIdAsync(scanId)`
-- [ ] T006 [US1] Add `POST {id}/vectorize-batch` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/003-batch-vectorize-scan/contracts/vectorize-batch.md`: thin controller; `200 OK` + JSON array of `Word` (same as `GetWords`); no request body
+- [X] T005 [US1] Implement `VectorizeBatchAsync(int scanId)` in `handwritingOCR.Server/Services/WordVectorizationService.cs`: `EnsureOptionsValid()`; `GetScanPathAsync` → throw `ResourceNotFoundException` if null; load file bytes once; if bytes null skip word loop (research §2a); foreach word from `GetUnvectorizedWordsByScanIdAsync` call core inside try/catch for `ArgumentException` and `ResourceNotFoundException` (swallow, continue); return `GetWordsByScanIdAsync(scanId)`
+- [X] T006 [US1] Add `POST {id}/vectorize-batch` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/003-batch-vectorize-scan/contracts/vectorize-batch.md`: thin controller; `200 OK` + JSON array of `Word` (same as `GetWords`); no request body
 
 **Checkpoint**: Happy-path batch и смешанный результат (quickstart §1–2) — MVP
 
@@ -65,8 +65,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T007 [US2] Verify SQL in `GetUnvectorizedWordsByScanIdAsync` in `handwritingOCR.Server/Services/WordDbService.cs` strictly filters `curve_points IS NULL` (no in-memory fallback that re-processes vectorized words)
-- [ ] T008 [US2] Confirm `VectorizeBatchAsync` in `handwritingOCR.Server/Services/WordVectorizationService.cs` iterates only the unvectorized list and never calls `UpdateCurvePointsAsync` for words with existing vectors (manual quickstart §3–4)
+- [X] T007 [US2] Verify SQL in `GetUnvectorizedWordsByScanIdAsync` in `handwritingOCR.Server/Services/WordDbService.cs` strictly filters `curve_points IS NULL` (no in-memory fallback that re-processes vectorized words)
+- [X] T008 [US2] Confirm `VectorizeBatchAsync` in `handwritingOCR.Server/Services/WordVectorizationService.cs` iterates only the unvectorized list and never calls `UpdateCurvePointsAsync` for words with existing vectors (manual quickstart §3–4)
 
 **Checkpoint**: Идемпотентность batch по отношению к уже векторизованным словам
 
@@ -80,8 +80,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T009 [US3] Map batch top-level exceptions in `POST {id}/vectorize-batch` action in `handwritingOCR.Server/Controllers/ScansController.cs`: `ResourceNotFoundException` → `404` plain text RU; `InvalidOperationException` → `503` plain text RU (constitution III)
-- [ ] T010 [US3] Ensure `VectorizeBatchAsync` in `handwritingOCR.Server/Services/WordVectorizationService.cs` calls `EnsureOptionsValid()` and scan-path check before the word loop and never returns `200` with word list when those checks fail
+- [X] T009 [US3] Map batch top-level exceptions in `POST {id}/vectorize-batch` action in `handwritingOCR.Server/Controllers/ScansController.cs`: `ResourceNotFoundException` → `404` plain text RU; `InvalidOperationException` → `503` plain text RU (constitution III)
+- [X] T010 [US3] Ensure `VectorizeBatchAsync` in `handwritingOCR.Server/Services/WordVectorizationService.cs` calls `EnsureOptionsValid()` and scan-path check before the word loop and never returns `200` with word list when those checks fail
 
 **Checkpoint**: Top-level ошибки отличимы от per-word неудач внутри `200`
 
@@ -95,7 +95,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T011 [US4] Verify batch response in `handwritingOCR.Server/Controllers/ScansController.cs` has no per-word error fields; smoke-test that unchanged single-word `POST {id}/words/{wordId}/vectorize` still returns diagnostic errors per `specs/001-word-stroke-vector/contracts/vectorize-word.md` after batch left word unvectorized
+- [X] T011 [US4] Verify batch response in `handwritingOCR.Server/Controllers/ScansController.cs` has no per-word error fields; smoke-test that unchanged single-word `POST {id}/words/{wordId}/vectorize` still returns diagnostic errors per `specs/001-word-stroke-vector/contracts/vectorize-word.md` after batch left word unvectorized
 
 **Checkpoint**: Диагностика per-word остаётся на одиночном контракте
 
@@ -105,9 +105,9 @@
 
 **Purpose**: Сквозная проверка и мелкая подчистка
 
-- [ ] T012 [P] Run through all scenarios in `specs/003-batch-vectorize-scan/quickstart.md` and fix gaps against `specs/003-batch-vectorize-scan/contracts/vectorize-batch.md`
-- [ ] T013 [P] Add brief «почему» comments in `handwritingOCR.Server/Services/WordVectorizationService.cs` for single file load per batch and swallowed per-word exceptions (FR-008, FR-012)
-- [ ] T014 Confirm batch `200` response array matches `GET /api/Scans/{id}/words` element format (`curvePoints` null vs N×4×2) via same `GetWordsByScanIdAsync` path in `handwritingOCR.Server/Services/WordDbService.cs`
+- [X] T012 [P] Run through all scenarios in `specs/003-batch-vectorize-scan/quickstart.md` and fix gaps against `specs/003-batch-vectorize-scan/contracts/vectorize-batch.md`
+- [X] T013 [P] Add brief «почему» comments in `handwritingOCR.Server/Services/WordVectorizationService.cs` for single file load per batch and swallowed per-word exceptions (FR-008, FR-012)
+- [X] T014 Confirm batch `200` response array matches `GET /api/Scans/{id}/words` element format (`curvePoints` null vs N×4×2) via same `GetWordsByScanIdAsync` path in `handwritingOCR.Server/Services/WordDbService.cs`
 
 ---
 
