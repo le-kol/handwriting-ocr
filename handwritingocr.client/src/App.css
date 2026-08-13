@@ -1,5 +1,5 @@
 #root {
-    max-width: 1280px;
+    /* max-width: 1280px; */
     margin: 0 auto;
     padding: 2rem;
     text-align: center;
@@ -11,6 +11,8 @@
     position: relative;
     display: inline-block;
     max-width: 100%;
+    min-width: 0;
+    flex: 1 1 0;
 }
 
 /* Картинка должна быть блочной: у строчной снизу остаётся отбивка под базовую
@@ -120,30 +122,8 @@
     border-bottom: 2px solid #2a9d3a;
 }
 
-.word.vectorized::after {
-    content: "";
-    display: inline-block;
-    width: 0.4em;
-    height: 0.4em;
-    margin-left: 0.15em;
-    border-radius: 50%;
-    background: #2a9d3a;
-    vertical-align: super;
-}
-
 .word.not-vectorized {
     border-bottom: 2px dashed #bbb;
-}
-
-.word.not-vectorized::after {
-    content: "";
-    display: inline-block;
-    width: 0.4em;
-    height: 0.4em;
-    margin-left: 0.15em;
-    border-radius: 50%;
-    background: #bbb;
-    vertical-align: super;
 }
 
 .editor .word-curve-thumb {
@@ -159,9 +139,21 @@
 
 .word-curve-thumb {
     display: block;
-    width: 4.5rem;
-    height: 2.25rem;
+    width: 9rem;
+    height: 4.5rem;
     color: #222;
     background: #fafafa;
     border: 1px solid #ddd;
+}
+
+.workspace {
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+    text-align: left;
+}
+
+.workspace-side {
+    flex: 1;
+    min-width: 0;
 }

@@ -536,6 +536,7 @@ function App() {
 
     function handleDragOverWord(event: React.DragEvent, lineIndex: number, positionInLine: number) {
         event.preventDefault();
+        event.stopPropagation();
         event.dataTransfer.dropEffect = "move";
         if (draggedWordId === null) return;
         setDropTarget(function (current) {
@@ -664,46 +665,121 @@ function App() {
             <p>Статус: {uploadStatus}</p>
             {scanId ? (
                 // При изменении scanId запросятся данные изображения с сервера для этого id
-                <div className="scan">
-                    <img src={"/api/scans/" + scanId + "/image"} onLoad={handleImageLoad} />
-                    {imageSize ? (
-                        // viewBox переводит пиксели исходного изображения в текущий размер картинки,
-                        // поэтому масштаб рамок не нужно считать вручную
-                        <svg viewBox={"0 0 " + imageSize.width + " " + imageSize.height}>
-                            {words ? words.map(function (word) {
-                                const isSelected = draft !== null && draft.id === word.id;
-                                // У выбранного слова рамка рисуется по черновику,
-                                // чтобы правка координат была видна до сохранения
-                                const shown = isSelected ? draft : word;
+                <div className="workspace">
+                    <div className="scan">
+                        <img src={"/api/scans/" + scanId + "/image"} onLoad={handleImageLoad} />
+                        {imageSize ? (
+                            // viewBox переводит пиксели исходного изображения в текущий размер картинки,
+                            // поэтому масштаб рамок не нужно считать вручную
+                            <svg viewBox={"0 0 " + imageSize.width + " " + imageSize.height}>
+                                {words ? words.map(function (word) {
+                                    const isSelected = draft !== null && draft.id === word.id;
+                                    // У выбранного слова рамка рисуется по черновику,
+                                    // чтобы правка координат была видна до сохранения
+                                    const shown = isSelected ? draft : word;
 
-                                return (
-                                    <polygon
-                                        key={word.id}
-                                        className={isSelected ? "selected" : undefined}
-                                        points={boxPoints(shown)}
-                                        onClick={function () { handleWordSelect(word); }}
-                                    />
-                                );
-                            }) : null}
-                            {/* Несохранённого слова в списке ещё нет, поэтому его рамка
-                                рисуется отдельно: иначе вводить координаты пришлось бы наугад */}
-                            {draft && draft.id === 0 ? (
-                                <polygon className="selected" points={boxPoints(draft)} />
-                            ) : null}
-                        </svg>
-                    ) : null}
-                </div>
-            ) : null}
-            {scanId ? (
-                // Распознавать можно только уже загруженный скан
-                <div>
-                    <button type="button" onClick={handleRecognizeClick} disabled={isRecognizing}>
-                        {isRecognizing ? "Распознавание..." : "Распознать текст"}
-                    </button>
-                    <button type="button" onClick={handleAddClick} disabled={isSaving}>
-                        Добавить слово
-                    </button>
-                    <p>Статус распознавания: {recognizeStatus}</p>
+                                    return (
+                                        <polygon
+                                            key={word.id}
+                                            className={isSelected ? "selected" : undefined}
+                                            points={boxPoints(shown)}
+                                            onClick={function () { handleWordSelect(word); }}
+                                        />
+                                    );
+                                }) : null}
+                                {/* Несохранённого слова в списке ещё нет, поэтому его рамка
+                                    рисуется отдельно: иначе вводить координаты пришлось бы наугад */}
+                                {draft && draft.id === 0 ? (
+                                    <polygon className="selected" points={boxPoints(draft)} />
+                                ) : null}
+                            </svg>
+                        ) : null}
+                    </div>
+                    <div className="workspace-side">
+                        {displayLines && displayLines.length > 0 ? (
+                            <div className="recognized-text-block">
+                                <div className="layout-toolbar">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveLayoutClick}
+                                        disabled={isSavingLayout || !layoutDirty}
+                                    >
+                                        {isSavingLayout ? "Сохранение..." : "Сохранить порядок"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleBatchVectorizeClick}
+                                        disabled={isBatchVectorizing || vectorizingWordId !== null}
+                                    >
+                                        {isBatchVectorizing ? "Пакетная векторизация…" : "Векторизовать все слова"}
+                                    </button>
+                                    <p>{layoutSaveStatus}</p>
+                                    {vectorizeStatus ? <p>{vectorizeStatus}</p> : null}
+                                </div>
+                                <div className="recognized-text">
+                                {displayLines.map(function (lineWords, lineIndex) {
+                                    return (
+                                        <p
+                                            key={"line-" + lineIndex}
+                                            onDragOver={function (event) { handleDragOverLine(event, lineIndex); }}
+                                            onDrop={function (event) {
+                                                handleDrop(event, lineIndex, lineWords.length);
+                                            }}
+                                        >
+                                            {lineWords.map(function (word, positionInLine) {
+                                                const isSelected = draft !== null && draft.id === word.id;
+                                                const shown = isSelected ? draft : word;
+                                                const isDragging = draggedWordId === word.id;
+                                                const isDropTarget = dropTarget !== null &&
+                                                    dropTarget.lineIndex === lineIndex &&
+                                                    dropTarget.positionInLine === positionInLine;
+                                                const vectorizationClass = isWordVectorized(word)
+                                                    ? " vectorized"
+                                                    : " not-vectorized";
+
+                                                return (
+                                                    <span key={word.id}>
+                                                        {positionInLine > 0 ? " " : null}
+                                                        <span
+                                                            className={
+                                                                "word" +
+                                                                vectorizationClass +
+                                                                (isSelected ? " selected" : "") +
+                                                                (isDragging ? " dragging" : "") +
+                                                                (isDropTarget ? " drop-target" : "")
+                                                            }
+                                                            draggable={true}
+                                                            onDragStart={function (event) { handleDragStart(event, word); }}
+                                                            onDragEnd={handleDragEnd}
+                                                            onDragOver={function (event) {
+                                                                handleDragOverWord(event, lineIndex, positionInLine);
+                                                            }}
+                                                            onDrop={function (event) {
+                                                                event.stopPropagation();
+                                                                handleDrop(event, lineIndex, positionInLine);
+                                                            }}
+                                                            onClick={function () { handleWordSelect(word); }}
+                                                        >
+                                                            {shown.text || (word.id === 0 ? "…" : "")}
+                                                        </span>
+                                                    </span>
+                                                );
+                                            })}
+                                        </p>
+                                    );
+                                })}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        <button type="button" onClick={handleRecognizeClick} disabled={isRecognizing}>
+                            {isRecognizing ? "Распознавание..." : "Распознать текст"}
+                        </button>
+                        <button type="button" onClick={handleAddClick} disabled={isSaving}>
+                            Добавить слово
+                        </button>
+                        <p>Статус распознавания: {recognizeStatus}</p>
+                    </div>
                 </div>
             ) : null}
             {words && words.length > 0 && draft === null ? (
@@ -760,80 +836,6 @@ function App() {
                     <button type="button" onClick={handleCancelClick}>Отмена</button>
                     <p>{saveStatus}</p>
                     {deleteStatus ? <p>{deleteStatus}</p> : null}
-                </div>
-            ) : null}
-            {displayLines && displayLines.length > 0 ? (
-                <div className="recognized-text-block">
-                    <div className="layout-toolbar">
-                        <button
-                            type="button"
-                            onClick={handleSaveLayoutClick}
-                            disabled={isSavingLayout || !layoutDirty}
-                        >
-                            {isSavingLayout ? "Сохранение..." : "Сохранить порядок"}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleBatchVectorizeClick}
-                            disabled={isBatchVectorizing || vectorizingWordId !== null}
-                        >
-                            {isBatchVectorizing ? "Пакетная векторизация…" : "Векторизовать все слова"}
-                        </button>
-                        <p>{layoutSaveStatus}</p>
-                        {vectorizeStatus ? <p>{vectorizeStatus}</p> : null}
-                    </div>
-                    <div className="recognized-text">
-                    {displayLines.map(function (lineWords, lineIndex) {
-                        return (
-                            <p
-                                key={"line-" + lineIndex}
-                                onDragOver={function (event) { handleDragOverLine(event, lineIndex); }}
-                                onDrop={function (event) {
-                                    handleDrop(event, lineIndex, lineWords.length);
-                                }}
-                            >
-                                {lineWords.map(function (word, positionInLine) {
-                                    const isSelected = draft !== null && draft.id === word.id;
-                                    const shown = isSelected ? draft : word;
-                                    const isDragging = draggedWordId === word.id;
-                                    const isDropTarget = dropTarget !== null &&
-                                        dropTarget.lineIndex === lineIndex &&
-                                        dropTarget.positionInLine === positionInLine;
-                                    const vectorizationClass = isWordVectorized(word)
-                                        ? " vectorized"
-                                        : " not-vectorized";
-
-                                    return (
-                                        <span key={word.id}>
-                                            {positionInLine > 0 ? " " : null}
-                                            <span
-                                                className={
-                                                    "word" +
-                                                    vectorizationClass +
-                                                    (isSelected ? " selected" : "") +
-                                                    (isDragging ? " dragging" : "") +
-                                                    (isDropTarget ? " drop-target" : "")
-                                                }
-                                                draggable={true}
-                                                onDragStart={function (event) { handleDragStart(event, word); }}
-                                                onDragEnd={handleDragEnd}
-                                                onDragOver={function (event) {
-                                                    handleDragOverWord(event, lineIndex, positionInLine);
-                                                }}
-                                                onDrop={function (event) {
-                                                    handleDrop(event, lineIndex, positionInLine);
-                                                }}
-                                                onClick={function () { handleWordSelect(word); }}
-                                            >
-                                                {shown.text || (word.id === 0 ? "…" : "")}
-                                            </span>
-                                        </span>
-                                    );
-                                })}
-                            </p>
-                        );
-                    })}
-                    </div>
                 </div>
             ) : null}
         </div>
