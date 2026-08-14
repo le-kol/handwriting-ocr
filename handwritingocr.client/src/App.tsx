@@ -761,71 +761,6 @@ function App() {
 
     return (
         <div>
-            <section className="scans-section">
-                <table className="scans-table">
-                    <thead>
-                        <tr>
-                            <th>Миниатюра</th>
-                            <th>Id</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {scanItems.map(function (item) {
-                            return (
-                                <tr
-                                    key={item.id}
-                                    className={item.id === scanId ? "current" : undefined}
-                                    onClick={function () { handleScanRowClick(item.id); }}
-                                >
-                                    <td className="scans-table-thumbnail">
-                                        {brokenThumbnails.has(item.id) ? null : (
-                                            <img
-                                                src={"/api/Scans/" + item.id + "/thumbnail"}
-                                                alt=""
-                                                onError={function () { handleThumbnailError(item.id); }}
-                                            />
-                                        )}
-                                    </td>
-                                    <td>{item.id}</td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-                <div className="scans-pagination">
-                    <button
-                        type="button"
-                        disabled={listPage <= 1 || listLoading}
-                        onClick={function () { setListPage(listPage - 1); }}
-                    >
-                        Назад
-                    </button>
-                    <span>Страница {listPage} из {lastPage}</span>
-                    <button
-                        type="button"
-                        disabled={listPage >= lastPage || listLoading}
-                        onClick={function () { setListPage(listPage + 1); }}
-                    >
-                        Вперёд
-                    </button>
-                </div>
-                {listLoading ? <p>Загрузка списка…</p> : null}
-                {listError && !listLoading ? (
-                    <div className="scans-list-error">
-                        <p>{listError}</p>
-                        <button
-                            type="button"
-                            onClick={function () { loadScansPage(listPage); }}
-                        >
-                            Повторить
-                        </button>
-                    </div>
-                ) : null}
-                {wordsOpenError ? <p>{wordsOpenError}</p> : null}
-            </section>
-            <input type="file" accept=".jpeg, .jpg, .png" onChange={handleFileChange} />
-            <p>Выбранный файл: {selectedFile ? selectedFile.name : "Не выбран"}</p>
-            <p>Статус: {uploadStatus}</p>
             {scanId ? (
                 // При изменении scanId запросятся данные изображения с сервера для этого id
                 <div className="workspace">
@@ -1001,6 +936,71 @@ function App() {
                     {deleteStatus ? <p>{deleteStatus}</p> : null}
                 </div>
             ) : null}
+            <section className="scans-section">
+                <table className="scans-table">
+                    <thead>
+                        <tr>
+                            <th>Миниатюра</th>
+                            <th>Id</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {scanItems.map(function (item) {
+                            return (
+                                <tr
+                                    key={item.id}
+                                    className={item.id === scanId ? "current" : undefined}
+                                    onClick={function () { handleScanRowClick(item.id); }}
+                                >
+                                    <td className="scans-table-thumbnail">
+                                        {brokenThumbnails.has(item.id) ? null : (
+                                            <img
+                                                src={"/api/Scans/" + item.id + "/thumbnail"}
+                                                alt=""
+                                                onError={function () { handleThumbnailError(item.id); }}
+                                            />
+                                        )}
+                                    </td>
+                                    <td>{item.id}</td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                <div className="scans-pagination">
+                    <button
+                        type="button"
+                        disabled={listPage <= 1 || listLoading}
+                        onClick={function () { setListPage(listPage - 1); }}
+                    >
+                        Назад
+                    </button>
+                    <span>Страница {listPage} из {lastPage}</span>
+                    <button
+                        type="button"
+                        disabled={listPage >= lastPage || listLoading}
+                        onClick={function () { setListPage(listPage + 1); }}
+                    >
+                        Вперёд
+                    </button>
+                </div>
+                {listLoading ? <p>Загрузка списка…</p> : null}
+                {listError && !listLoading ? (
+                    <div className="scans-list-error">
+                        <p>{listError}</p>
+                        <button
+                            type="button"
+                            onClick={function () { loadScansPage(listPage); }}
+                        >
+                            Повторить
+                        </button>
+                    </div>
+                ) : null}
+                {wordsOpenError ? <p>{wordsOpenError}</p> : null}
+            </section>
+            <input type="file" accept=".jpeg, .jpg, .png" onChange={handleFileChange} />
+            <p>Выбранный файл: {selectedFile ? selectedFile.name : "Не выбран"}</p>
+            <p>Статус: {uploadStatus}</p>
         </div>
     );
 }
