@@ -322,11 +322,16 @@ function App() {
     const [isDeletingScan, setIsDeletingScan] = useState(false);
     const [deleteScanStatus, setDeleteScanStatus] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const scanIdRef = useRef<number | null>(scanId);
+    scanIdRef.current = scanId;
+    /** Инкремент при смене скана/сбросе — отменяет устаревшие async-колбэки */
+    const editorGenerationRef = useRef(0);
     const [brokenThumbnails, setBrokenThumbnails] = useState<Set<number>>(function () {
         return new Set();
     });
 
     function resetEditorState() {
+        editorGenerationRef.current += 1;
         setWords(null);
         setLayoutLines(null);
         setSavedLayoutSignature(null);
@@ -420,10 +425,17 @@ function App() {
         resetEditorState();
         setWordsOpenError(null);
         setScanId(id);
+        const generation = editorGenerationRef.current;
         fetchWords(id).then(function (list) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== id) {
+                return;
+            }
             setWords(list);
             syncLayoutFromWords(list);
         }).catch(function (error) {
+            if (editorGenerationRef.current !== generation) {
+                return;
+            }
             setWordsOpenError("Не удалось загрузить слова: " + error.message);
         });
     }
@@ -508,10 +520,15 @@ function App() {
             return;
         }
 
+        const requestScanId = scanId;
+        const generation = editorGenerationRef.current;
         setVectorizingWordId(word.id);
         setVectorizeStatus("Векторизация слова…");
 
-        vectorizeWord(scanId, word.id).then(function (updated) {
+        vectorizeWord(requestScanId, word.id).then(function (updated) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
             setWords(function (current) {
                 if (!current) {
                     return current;
@@ -531,10 +548,15 @@ function App() {
             });
             setVectorizeStatus("Векторизация завершена");
         }).catch(function (error) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
             // Ошибка не очищает curvePoints / миниатюру уже векторизованного слова
             setVectorizeStatus("Ошибка векторизации: " + error.message);
         }).finally(function () {
-            setVectorizingWordId(null);
+            if (editorGenerationRef.current === generation) {
+                setVectorizingWordId(null);
+            }
         });
     }
 
@@ -570,10 +592,15 @@ function App() {
             return;
         }
 
+        const requestScanId = scanId;
+        const generation = editorGenerationRef.current;
         setIsBatchVectorizing(true);
         setVectorizeStatus("Пакетная векторизация…");
 
-        vectorizeBatch(scanId).then(function (data) {
+        vectorizeBatch(requestScanId).then(function (data) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
             setWords(data);
             syncLayoutFromWords(data);
             setDraft(function (current) {
@@ -585,9 +612,14 @@ function App() {
             });
             setVectorizeStatus("Пакетная векторизация завершена");
         }).catch(function (error) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
             setVectorizeStatus("Ошибка пакетной векторизации: " + error.message);
         }).finally(function () {
-            setIsBatchVectorizing(false);
+            if (editorGenerationRef.current === generation) {
+                setIsBatchVectorizing(false);
+            }
         });
     }
 
