@@ -26,7 +26,7 @@ Backend: `handwritingOCR.Server/`
 
 **Purpose**: Подтвердить brownfield-зависимости перед реализацией
 
-- [ ] T001 Confirm prerequisites: SixLabors.ImageSharp in `handwritingOCR.Server/handwritingOCR.Server.csproj`; `ScanDbService` (`InsertScanAsync`, `GetScanPathAsync`) in `handwritingOCR.Server/Services/ScanDbService.cs`; `WordVectorizationOptions` + `Configure<>` in `handwritingOCR.Server/Options/WordVectorizationOptions.cs` and `handwritingOCR.Server/Program.cs`; `GetImage` 404 texts in `handwritingOCR.Server/Controllers/ScansController.cs`; `fetchWords` in `handwritingocr.client/src/App.tsx`
+- [X] T001 Confirm prerequisites: SixLabors.ImageSharp in `handwritingOCR.Server/handwritingOCR.Server.csproj`; `ScanDbService` (`InsertScanAsync`, `GetScanPathAsync`) in `handwritingOCR.Server/Services/ScanDbService.cs`; `WordVectorizationOptions` + `Configure<>` in `handwritingOCR.Server/Options/WordVectorizationOptions.cs` and `handwritingOCR.Server/Program.cs`; `GetImage` 404 texts in `handwritingOCR.Server/Controllers/ScansController.cs`; `fetchWords` in `handwritingocr.client/src/App.tsx`
 
 ---
 
@@ -36,11 +36,11 @@ Backend: `handwritingOCR.Server/`
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 [P] Add `ScanListOptions` in `handwritingOCR.Server/Options/ScanListOptions.cs` mirroring `WordVectorizationOptions`: `SectionName = "ScanList"`, `PageSize` int default **30**
-- [ ] T003 [P] Add `ScanListPage` (or equivalent) in `handwritingOCR.Server/Models/ScanListPage.cs`: `Items` as `{ Id }` list + `TotalCount` int per `specs/005-scans-table-thumbnails/data-model.md`
-- [ ] T004 Add `"ScanList": { "PageSize": 30 }` to `handwritingOCR.Server/appsettings.json`
-- [ ] T005 Register `builder.Services.Configure<ScanListOptions>(…GetSection(ScanListOptions.SectionName))` in `handwritingOCR.Server/Program.cs`
-- [ ] T006 Add `GetScansPageAsync(int page, int pageSize)` to `handwritingOCR.Server/Services/ScanDbService.cs`: one pooled connection; `SELECT COUNT(*)::int FROM scans`; `SELECT id FROM scans ORDER BY id DESC LIMIT @limit OFFSET @offset` with `offset = (page - 1) * pageSize`; return `ScanListPage`; no `page < 1` check here
+- [X] T002 [P] Add `ScanListOptions` in `handwritingOCR.Server/Options/ScanListOptions.cs` mirroring `WordVectorizationOptions`: `SectionName = "ScanList"`, `PageSize` int default **30**
+- [X] T003 [P] Add `ScanListPage` (or equivalent) in `handwritingOCR.Server/Models/ScanListPage.cs`: `Items` as `{ Id }` list + `TotalCount` int per `specs/005-scans-table-thumbnails/data-model.md`
+- [X] T004 Add `"ScanList": { "PageSize": 30 }` to `handwritingOCR.Server/appsettings.json`
+- [X] T005 Register `builder.Services.Configure<ScanListOptions>(…GetSection(ScanListOptions.SectionName))` in `handwritingOCR.Server/Program.cs`
+- [X] T006 Add `GetScansPageAsync(int page, int pageSize)` to `handwritingOCR.Server/Services/ScanDbService.cs`: one pooled connection; `SELECT COUNT(*)::int FROM scans`; `SELECT id FROM scans ORDER BY id DESC LIMIT @limit OFFSET @offset` with `offset = (page - 1) * pageSize`; return `ScanListPage`; no `page < 1` check here
 
 **Checkpoint**: Options и SQL страницы готовы; HTTP и UI ещё нет
 
@@ -54,14 +54,14 @@ Backend: `handwritingOCR.Server/`
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Add `GET` (no template) `?page=` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/005-scans-table-thumbnails/contracts/scans-list.md`: inject `IOptions<ScanListOptions>`; missing `page` → 1; `page < 1` → 400 RU «Номер страницы должен быть не меньше 1»; `PageSize <= 0` → 503; else `GetScansPageAsync` → `200` JSON `{ items, totalCount }`; no SQL in controller
-- [ ] T008 [P] [US1] Add scoped `ScanThumbnailService` in `handwritingOCR.Server/Services/ScanThumbnailService.cs`: `GetScanPathAsync` null → `ResourceNotFoundException("Не найдена запись в БД")`; `GetFileAsync` null → `ResourceNotFoundException("Не найден файл")`; ImageSharp `Load` + `ResizeMode.Max` 200×200 (no upscale); encode as source PNG/JPEG by path extension; catch `UnknownImageFormatException`/`InvalidImageContentException` → `ArgumentException("Повреждённое или нечитаемое изображение скана.")`; register `AddScoped` in `handwritingOCR.Server/Program.cs`
-- [ ] T009 [US1] Add `GET {id}/thumbnail` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/005-scans-table-thumbnails/contracts/scan-thumbnail.md`: map 404/400 like vectorize; `File(bytes, contentType)`; header `Cache-Control: public, max-age=86400`; do not write files to disk
-- [ ] T010 [P] [US1] Add `.scans-table` (and thumbnail cell) styles in `handwritingocr.client/src/App.css`: compact rows, img max ~200px, overflow hidden
-- [ ] T011 [US1] Add `SCAN_PAGE_SIZE = 30` and `fetchScansPage(page)` in `handwritingocr.client/src/App.tsx`: `GET /api/Scans?page=`; parse `{ items, totalCount }`; on `!ok` throw `Error(await response.text())`
-- [ ] T012 [US1] Add list state in `handwritingocr.client/src/App.tsx` (`scanItems`, `totalCount`, `listPage` starting at 1, `listError`) and load page 1 on mount
-- [ ] T013 [US1] Render scans table on the main screen in `handwritingocr.client/src/App.tsx`: columns thumbnail (`/api/Scans/{id}/thumbnail`, not `/image`) and id; empty DB → no rows
-- [ ] T014 [US1] After successful upload in `handleFileChange` in `handwritingocr.client/src/App.tsx`: set `listPage` to 1 and refetch page 1 so the new scan appears at the top
+- [X] T007 [US1] Add `GET` (no template) `?page=` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/005-scans-table-thumbnails/contracts/scans-list.md`: inject `IOptions<ScanListOptions>`; missing `page` → 1; `page < 1` → 400 RU «Номер страницы должен быть не меньше 1»; `PageSize <= 0` → 503; else `GetScansPageAsync` → `200` JSON `{ items, totalCount }`; no SQL in controller
+- [X] T008 [P] [US1] Add scoped `ScanThumbnailService` in `handwritingOCR.Server/Services/ScanThumbnailService.cs`: `GetScanPathAsync` null → `ResourceNotFoundException("Не найдена запись в БД")`; `GetFileAsync` null → `ResourceNotFoundException("Не найден файл")`; ImageSharp `Load` + `ResizeMode.Max` 200×200 (no upscale); encode as source PNG/JPEG by path extension; catch `UnknownImageFormatException`/`InvalidImageContentException` → `ArgumentException("Повреждённое или нечитаемое изображение скана.")`; register `AddScoped` in `handwritingOCR.Server/Program.cs`
+- [X] T009 [US1] Add `GET {id}/thumbnail` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/005-scans-table-thumbnails/contracts/scan-thumbnail.md`: map 404/400 like vectorize; `File(bytes, contentType)`; header `Cache-Control: public, max-age=86400`; do not write files to disk
+- [X] T010 [P] [US1] Add `.scans-table` (and thumbnail cell) styles in `handwritingocr.client/src/App.css`: compact rows, img max ~200px, overflow hidden
+- [X] T011 [US1] Add `SCAN_PAGE_SIZE = 30` and `fetchScansPage(page)` in `handwritingocr.client/src/App.tsx`: `GET /api/Scans?page=`; parse `{ items, totalCount }`; on `!ok` throw `Error(await response.text())`
+- [X] T012 [US1] Add list state in `handwritingocr.client/src/App.tsx` (`scanItems`, `totalCount`, `listPage` starting at 1, `listError`) and load page 1 on mount
+- [X] T013 [US1] Render scans table on the main screen in `handwritingocr.client/src/App.tsx`: columns thumbnail (`/api/Scans/{id}/thumbnail`, not `/image`) and id; empty DB → no rows
+- [X] T014 [US1] After successful upload in `handleFileChange` in `handwritingocr.client/src/App.tsx`: set `listPage` to 1 and refetch page 1 so the new scan appears at the top
 
 **Checkpoint**: MVP — первая страница таблицы с миниатюрами; upload обновляет список
 
@@ -75,10 +75,10 @@ Backend: `handwritingOCR.Server/`
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Add «Назад» / «Вперёд» controls in `handwritingocr.client/src/App.tsx` that change `listPage` and refetch; paging MUST NOT reset `scanId` / editor
-- [ ] T016 [US2] Compute `lastPage = max(1, ceil(totalCount / SCAN_PAGE_SIZE))` in `handwritingocr.client/src/App.tsx`; disable «Назад» on page 1 and «Вперёд» on last page (including empty DB)
-- [ ] T017 [US2] On list fetch failure in `handwritingocr.client/src/App.tsx`: set RU `listError` from `error.message`; do **not** `setScanItems([])` if items were already shown; first-load failure → empty table + message
-- [ ] T018 [US2] Confirm upload-from-page-2+ in `handwritingocr.client/src/App.tsx` always forces `listPage = 1` and refetch (clarification A / FR-012); adjust T014 if still staying on the old page
+- [X] T015 [US2] Add «Назад» / «Вперёд» controls in `handwritingocr.client/src/App.tsx` that change `listPage` and refetch; paging MUST NOT reset `scanId` / editor
+- [X] T016 [US2] Compute `lastPage = max(1, ceil(totalCount / SCAN_PAGE_SIZE))` in `handwritingocr.client/src/App.tsx`; disable «Назад» on page 1 and «Вперёд» on last page (including empty DB)
+- [X] T017 [US2] On list fetch failure in `handwritingocr.client/src/App.tsx`: set RU `listError` from `error.message`; do **not** `setScanItems([])` if items were already shown; first-load failure → empty table + message
+- [X] T018 [US2] Confirm upload-from-page-2+ in `handwritingocr.client/src/App.tsx` always forces `listPage = 1` and refetch (clarification A / FR-012); adjust T014 if still staying on the old page
 
 **Checkpoint**: Пагинация и устойчивость списка к сбоям
 
@@ -92,10 +92,10 @@ Backend: `handwritingOCR.Server/`
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] Extract shared editor reset from `handleFileChange` into a helper in `handwritingocr.client/src/App.tsx` (same fields: words, layout, draft, statuses, imageSize, drag, vectorize/delete flags); `handleFileChange` must still call it
-- [ ] T020 [US3] Implement row-click handler in `handwritingocr.client/src/App.tsx`: call reset helper; `setScanId(id)`; `fetchWords(id)` then `setWords` + `syncLayoutFromWords`; do **not** call recognize; on words error show RU text and keep previous-scan data cleared
-- [ ] T021 [US3] Apply current-row class on the table row when `item.id === scanId` in `handwritingocr.client/src/App.tsx`; no highlight if current scan is absent from the page or `scanId` is null
-- [ ] T022 [P] [US3] Add distinguishable `.scans-table tr.current` (or equivalent) styles in `handwritingocr.client/src/App.css`
+- [X] T019 [US3] Extract shared editor reset from `handleFileChange` into a helper in `handwritingocr.client/src/App.tsx` (same fields: words, layout, draft, statuses, imageSize, drag, vectorize/delete flags); `handleFileChange` must still call it
+- [X] T020 [US3] Implement row-click handler in `handwritingocr.client/src/App.tsx`: call reset helper; `setScanId(id)`; `fetchWords(id)` then `setWords` + `syncLayoutFromWords`; do **not** call recognize; on words error show RU text and keep previous-scan data cleared
+- [X] T021 [US3] Apply current-row class on the table row when `item.id === scanId` in `handwritingocr.client/src/App.tsx`; no highlight if current scan is absent from the page or `scanId` is null
+- [X] T022 [P] [US3] Add distinguishable `.scans-table tr.current` (or equivalent) styles in `handwritingocr.client/src/App.css`
 
 **Checkpoint**: Переключение сканов из таблицы без утечки состояния и без авто-OCR
 
@@ -109,8 +109,8 @@ Backend: `handwritingOCR.Server/`
 
 ### Implementation for User Story 4
 
-- [ ] T023 [US4] Handle thumbnail `onError` in the table `<img>` in `handwritingocr.client/src/App.tsx` so the cell becomes empty/placeholder and the row (id) stays visible
-- [ ] T024 [US4] Verify `GET …/thumbnail` in `handwritingOCR.Server/Controllers/ScansController.cs` + `ScanThumbnailService.cs` matches `specs/005-scans-table-thumbnails/contracts/scan-thumbnail.md` (404 «Не найдена запись в БД» / «Не найден файл»; 400 corrupt message); fix gaps only
+- [X] T023 [US4] Handle thumbnail `onError` in the table `<img>` in `handwritingocr.client/src/App.tsx` so the cell becomes empty/placeholder and the row (id) stays visible
+- [X] T024 [US4] Verify `GET …/thumbnail` in `handwritingOCR.Server/Controllers/ScansController.cs` + `ScanThumbnailService.cs` matches `specs/005-scans-table-thumbnails/contracts/scan-thumbnail.md` (404 «Не найдена запись в БД» / «Не найден файл»; 400 corrupt message); fix gaps only
 
 **Checkpoint**: Повреждённая миниатюра не валит список
 
@@ -120,9 +120,9 @@ Backend: `handwritingOCR.Server/`
 
 **Purpose**: Согласованность контракта и ручная приёмка
 
-- [ ] T025 [P] Review RU strings (page validation, listError, words-open error) in `handwritingOCR.Server/Controllers/ScansController.cs` and `handwritingocr.client/src/App.tsx` against existing App/controller messages
-- [ ] T026 Confirm table cells never use `/image` and no new Liquibase changeset exists under `liquibase/`; thumbnail files are not written under `Storage:ScansFolder`
-- [ ] T027 Run manual validation scenarios from `specs/005-scans-table-thumbnails/quickstart.md` §§1–8 against running SPA+API
+- [X] T025 [P] Review RU strings (page validation, listError, words-open error) in `handwritingOCR.Server/Controllers/ScansController.cs` and `handwritingocr.client/src/App.tsx` against existing App/controller messages
+- [X] T026 Confirm table cells never use `/image` and no new Liquibase changeset exists under `liquibase/`; thumbnail files are not written under `Storage:ScansFolder`
+- [X] T027 Run manual validation scenarios from `specs/005-scans-table-thumbnails/quickstart.md` §§1–8 against running SPA+API
 
 ---
 

@@ -23,6 +23,14 @@ interface Word {
     curvePoints?: number[][][] | null;
 }
 
+interface ScanListItem {
+    id: number;
+}
+
+const SCAN_PAGE_SIZE = 30;
+const SCANS_LIST_RETRY_ATTEMPTS = 5;
+const SCANS_LIST_RETRY_DELAY_MS = 1000;
+
 type CoordinateField = "x1" | "y1" | "x2" | "y2" | "x3" | "y3" | "x4" | "y4";
 
 const coordinateFields: CoordinateField[] = ["x1", "y1", "x2", "y2", "x3", "y3", "x4", "y4"];
@@ -156,10 +164,50 @@ function wordContentBody(word: Word) {
 function fetchWords(scanId: number): Promise<Word[]> {
     return fetch("/api/Scans/" + scanId + "/words").then(function (response) {
         if (!response.ok) {
-            throw new Error("не удалось получить слова: " + response.status);
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
         }
         return response.json() as Promise<Word[]>;
     });
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise(function (resolve) {
+        setTimeout(resolve, ms);
+    });
+}
+
+async function fetchScansPageWithRetry(
+    page: number
+): Promise<{ items: ScanListItem[]; totalCount: number }> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < SCANS_LIST_RETRY_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+            await delay(SCANS_LIST_RETRY_DELAY_MS);
+        }
+
+        let response: Response;
+        try {
+            response = await fetch("/api/Scans?page=" + page);
+        } catch {
+            lastError = new Error("Сервер недоступен");
+            continue;
+        }
+
+        if (response.ok) {
+            return await response.json() as { items: ScanListItem[]; totalCount: number };
+        }
+
+        const message = await response.text();
+        lastError = new Error(message || String(response.status));
+        if (response.status !== 502 && response.status !== 503) {
+            throw lastError;
+        }
+    }
+
+    throw lastError ?? new Error("Не удалось загрузить список сканов");
 }
 
 function vectorizeWord(scanId: number, wordId: number): Promise<Word> {
@@ -253,6 +301,50 @@ function App() {
     const [isBatchVectorizing, setIsBatchVectorizing] = useState(false);
     const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null);
     const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
+    const [scanItems, setScanItems] = useState<ScanListItem[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [listPage, setListPage] = useState(1);
+    const [listLoading, setListLoading] = useState(false);
+    const [listError, setListError] = useState<string | null>(null);
+    const [wordsOpenError, setWordsOpenError] = useState<string | null>(null);
+    const [brokenThumbnails, setBrokenThumbnails] = useState<Set<number>>(function () {
+        return new Set();
+    });
+
+    function resetEditorState() {
+        setWords(null);
+        setLayoutLines(null);
+        setSavedLayoutSignature(null);
+        setRecognizeStatus(null);
+        setImageSize(null);
+        setDraft(null);
+        setSaveStatus(null);
+        setLayoutSaveStatus(null);
+        setDraggedWordId(null);
+        setDropTarget(null);
+        setVectorizingWordId(null);
+        setIsBatchVectorizing(false);
+        setVectorizeStatus(null);
+        setDeleteStatus(null);
+    }
+
+    function loadScansPage(page: number) {
+        setListLoading(true);
+        setListError(null);
+        fetchScansPageWithRetry(page).then(function (data) {
+            setScanItems(data.items);
+            setTotalCount(data.totalCount);
+            setListError(null);
+        }).catch(function (error) {
+            setListError(error instanceof Error ? error.message : String(error));
+        }).finally(function () {
+            setListLoading(false);
+        });
+    }
+
+    useEffect(function () {
+        loadScansPage(listPage);
+    }, [listPage]);
 
     function syncLayoutFromWords(list: Word[]) {
         const layout = buildLayoutFromWords(list);
@@ -270,21 +362,7 @@ function App() {
     function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0] ?? null;
         setSelectedFile(file);
-        // Результат распознавания относится к прежнему скану, поэтому его нужно сбросить
-        setWords(null);
-        setLayoutLines(null);
-        setSavedLayoutSignature(null);
-        setRecognizeStatus(null);
-        setImageSize(null);
-        setDraft(null);
-        setSaveStatus(null);
-        setLayoutSaveStatus(null);
-        setDraggedWordId(null);
-        setDropTarget(null);
-        setVectorizingWordId(null);
-        setIsBatchVectorizing(false);
-        setVectorizeStatus(null);
-        setDeleteStatus(null);
+        resetEditorState();
 
         if (file) {
             // Запрос для отправки файла на сервер
@@ -300,10 +378,32 @@ function App() {
             }).then(function (data) {
                 setScanId(data.id);
                 setUploadStatus("Загрузка завершена");
+                setListPage(1);
+                loadScansPage(1);
             }).catch(function (error) {
                 setUploadStatus("Ошибка загрузки: " + error.message);
             });
         }
+    }
+
+    function handleScanRowClick(id: number) {
+        resetEditorState();
+        setWordsOpenError(null);
+        setScanId(id);
+        fetchWords(id).then(function (list) {
+            setWords(list);
+            syncLayoutFromWords(list);
+        }).catch(function (error) {
+            setWordsOpenError("Не удалось загрузить слова: " + error.message);
+        });
+    }
+
+    function handleThumbnailError(id: number) {
+        setBrokenThumbnails(function (current) {
+            const next = new Set(current);
+            next.add(id);
+            return next;
+        });
     }
 
     // Запрос на распознавание текста загруженного скана
@@ -657,9 +757,72 @@ function App() {
     const layoutDirty = savedLayoutSignature !== null &&
         effectiveLayout !== null &&
         layoutSignature(effectiveLayout) !== savedLayoutSignature;
+    const lastPage = Math.max(1, Math.ceil(totalCount / SCAN_PAGE_SIZE));
 
     return (
         <div>
+            <section className="scans-section">
+                <table className="scans-table">
+                    <thead>
+                        <tr>
+                            <th>Миниатюра</th>
+                            <th>Id</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {scanItems.map(function (item) {
+                            return (
+                                <tr
+                                    key={item.id}
+                                    className={item.id === scanId ? "current" : undefined}
+                                    onClick={function () { handleScanRowClick(item.id); }}
+                                >
+                                    <td className="scans-table-thumbnail">
+                                        {brokenThumbnails.has(item.id) ? null : (
+                                            <img
+                                                src={"/api/Scans/" + item.id + "/thumbnail"}
+                                                alt=""
+                                                onError={function () { handleThumbnailError(item.id); }}
+                                            />
+                                        )}
+                                    </td>
+                                    <td>{item.id}</td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                <div className="scans-pagination">
+                    <button
+                        type="button"
+                        disabled={listPage <= 1 || listLoading}
+                        onClick={function () { setListPage(listPage - 1); }}
+                    >
+                        Назад
+                    </button>
+                    <span>Страница {listPage} из {lastPage}</span>
+                    <button
+                        type="button"
+                        disabled={listPage >= lastPage || listLoading}
+                        onClick={function () { setListPage(listPage + 1); }}
+                    >
+                        Вперёд
+                    </button>
+                </div>
+                {listLoading ? <p>Загрузка списка…</p> : null}
+                {listError && !listLoading ? (
+                    <div className="scans-list-error">
+                        <p>{listError}</p>
+                        <button
+                            type="button"
+                            onClick={function () { loadScansPage(listPage); }}
+                        >
+                            Повторить
+                        </button>
+                    </div>
+                ) : null}
+                {wordsOpenError ? <p>{wordsOpenError}</p> : null}
+            </section>
             <input type="file" accept=".jpeg, .jpg, .png" onChange={handleFileChange} />
             <p>Выбранный файл: {selectedFile ? selectedFile.name : "Не выбран"}</p>
             <p>Статус: {uploadStatus}</p>

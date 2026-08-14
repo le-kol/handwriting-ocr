@@ -1,6 +1,8 @@
 using handwritingOCR.Server.Models;
+using handwritingOCR.Server.Options;
 using handwritingOCR.Server.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace handwritingOCR.Server.Controllers
 {
@@ -10,22 +12,48 @@ namespace handwritingOCR.Server.Controllers
     {
         private readonly FileStorageService _fileStorageService;
         private readonly ScanDbService _scanDbService;
+        private readonly ScanThumbnailService _scanThumbnailService;
         private readonly WordDbService _wordDbService;
         private readonly YandexOcrService _yandexOcrService;
         private readonly WordVectorizationService _wordVectorizationService;
+        private readonly ScanListOptions _scanListOptions;
 
         public ScansController(
             FileStorageService fileStorageService,
             ScanDbService scanDbService,
+            ScanThumbnailService scanThumbnailService,
             WordDbService wordDbService,
             YandexOcrService yandexOcrService,
-            WordVectorizationService wordVectorizationService)
+            WordVectorizationService wordVectorizationService,
+            IOptions<ScanListOptions> scanListOptions)
         {
             _fileStorageService = fileStorageService;
             _scanDbService = scanDbService;
+            _scanThumbnailService = scanThumbnailService;
             _wordDbService = wordDbService;
             _yandexOcrService = yandexOcrService;
             _wordVectorizationService = wordVectorizationService;
+            _scanListOptions = scanListOptions.Value;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetScansPage([FromQuery] int page = 1)
+        {
+            if (page < 1)
+            {
+                return BadRequest("Номер страницы должен быть не меньше 1");
+            }
+
+            var pageSize = _scanListOptions.PageSize;
+            if (pageSize <= 0)
+            {
+                return StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "Не задана или невалидна конфигурация ScanList: PageSize > 0.");
+            }
+
+            var result = await _scanDbService.GetScansPageAsync(page, pageSize);
+            return Ok(result);
         }
 
         // Метод для загрузки файлов изображений на сервер
@@ -72,6 +100,25 @@ namespace handwritingOCR.Server.Controllers
             }
 
             return File(fileBytes, contentType);
+        }
+
+        [HttpGet("{id}/thumbnail")]
+        public async Task<IActionResult> GetThumbnail(int id)
+        {
+            try
+            {
+                var (bytes, contentType) = await _scanThumbnailService.GetThumbnailAsync(id);
+                Response.Headers.CacheControl = "public, max-age=86400";
+                return File(bytes, contentType);
+            }
+            catch (ResourceNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpGet("{id}/words")]
