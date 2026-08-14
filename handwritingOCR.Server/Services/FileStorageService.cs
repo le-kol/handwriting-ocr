@@ -57,5 +57,16 @@
             return fileBytes;
         }
 
+        public Task DeleteFileIfExistsAsync(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return Task.CompletedTask;
+            }
+
+            File.Delete(path);
+            return Task.CompletedTask;
+        }
+
     }
 }

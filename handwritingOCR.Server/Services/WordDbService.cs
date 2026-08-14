@@ -27,6 +27,29 @@ namespace handwritingOCR.Server.Services
             return await LoadWordsAsync(connection, null, scanId);
         }
 
+        public async Task<IReadOnlyList<Word>> GetUnvectorizedWordsByScanIdAsync(int scanId)
+        {
+            await using var connection = await OpenConnectionAsync();
+            const string query = """
+                SELECT id, scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index, line_index, curve_points
+                FROM words
+                WHERE scan_id = @scanId AND curve_points IS NULL
+                ORDER BY order_index
+                """;
+
+            await using var command = new NpgsqlCommand(query, connection);
+            command.Parameters.AddWithValue("scanId", scanId);
+
+            var words = new List<Word>();
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                words.Add(ReadWord(reader));
+            }
+
+            return words;
+        }
+
         // null — слова нет или оно принадлежит другому скану
         public async Task<Word?> GetWordAsync(int scanId, int wordId)
         {

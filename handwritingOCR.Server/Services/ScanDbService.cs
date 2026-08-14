@@ -1,3 +1,4 @@
+using handwritingOCR.Server.Models;
 using Npgsql;
 
 namespace handwritingOCR.Server.Services
@@ -47,6 +48,50 @@ namespace handwritingOCR.Server.Services
                     return (string?)filePath;
                 }
             }
+        }
+
+        public async Task<ScanListPage> GetScansPageAsync(int page, int pageSize)
+        {
+            var connectionString = _configuration.GetConnectionString("Default");
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+
+            int totalCount;
+            await using (var countCommand = new NpgsqlCommand("SELECT COUNT(*)::int FROM scans", connection))
+            {
+                totalCount = (int)(await countCommand.ExecuteScalarAsync())!;
+            }
+
+            var items = new List<ScanListItem>();
+            var offset = (page - 1) * pageSize;
+            await using (var selectCommand = new NpgsqlCommand(
+                "SELECT id FROM scans ORDER BY id DESC LIMIT @limit OFFSET @offset",
+                connection))
+            {
+                selectCommand.Parameters.AddWithValue("limit", pageSize);
+                selectCommand.Parameters.AddWithValue("offset", offset);
+                await using var reader = await selectCommand.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    items.Add(new ScanListItem { Id = reader.GetInt32(0) });
+                }
+            }
+
+            return new ScanListPage { Items = items, TotalCount = totalCount };
+        }
+
+        public async Task<string?> DeleteScanAsync(int id)
+        {
+            var connectionString = _configuration.GetConnectionString("Default");
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            const string deleteQuery = "DELETE FROM scans WHERE id = @id RETURNING path";
+
+            await using var command = new NpgsqlCommand(deleteQuery, connection);
+            command.Parameters.AddWithValue("id", id);
+            var path = await command.ExecuteScalarAsync();
+
+            return (string?)path;
         }
     }
 }

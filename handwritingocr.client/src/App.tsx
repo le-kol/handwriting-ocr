@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { isWordVectorized } from './curvePoints';
 import WordCurveThumbnail from './WordCurveThumbnail';
@@ -22,6 +22,14 @@ interface Word {
     /** Кривые Безье в СК фрагмента; отсутствует / null / [] — не векторизовано */
     curvePoints?: number[][][] | null;
 }
+
+interface ScanListItem {
+    id: number;
+}
+
+const SCAN_PAGE_SIZE = 30;
+const SCANS_LIST_RETRY_ATTEMPTS = 5;
+const SCANS_LIST_RETRY_DELAY_MS = 1000;
 
 type CoordinateField = "x1" | "y1" | "x2" | "y2" | "x3" | "y3" | "x4" | "y4";
 
@@ -156,10 +164,50 @@ function wordContentBody(word: Word) {
 function fetchWords(scanId: number): Promise<Word[]> {
     return fetch("/api/Scans/" + scanId + "/words").then(function (response) {
         if (!response.ok) {
-            throw new Error("не удалось получить слова: " + response.status);
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
         }
         return response.json() as Promise<Word[]>;
     });
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise(function (resolve) {
+        setTimeout(resolve, ms);
+    });
+}
+
+async function fetchScansPageWithRetry(
+    page: number
+): Promise<{ items: ScanListItem[]; totalCount: number }> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < SCANS_LIST_RETRY_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+            await delay(SCANS_LIST_RETRY_DELAY_MS);
+        }
+
+        let response: Response;
+        try {
+            response = await fetch("/api/Scans?page=" + page);
+        } catch {
+            lastError = new Error("Сервер недоступен");
+            continue;
+        }
+
+        if (response.ok) {
+            return await response.json() as { items: ScanListItem[]; totalCount: number };
+        }
+
+        const message = await response.text();
+        lastError = new Error(message || String(response.status));
+        if (response.status !== 502 && response.status !== 503) {
+            throw lastError;
+        }
+    }
+
+    throw lastError ?? new Error("Не удалось загрузить список сканов");
 }
 
 function vectorizeWord(scanId: number, wordId: number): Promise<Word> {
@@ -173,6 +221,54 @@ function vectorizeWord(scanId: number, wordId: number): Promise<Word> {
         }
         return response.json() as Promise<Word>;
     });
+}
+
+function deleteWord(scanId: number, wordId: number): Promise<void> {
+    return fetch("/api/Scans/" + scanId + "/words/" + wordId, {
+        method: "DELETE",
+    }).then(function (response) {
+        if (!response.ok) {
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
+        }
+    });
+}
+
+function deleteScan(id: number): Promise<void> {
+    return fetch("/api/Scans/" + id, {
+        method: "DELETE",
+    }).then(function (response) {
+        if (response.status !== 204) {
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
+        }
+    });
+}
+
+function vectorizeBatch(scanId: number): Promise<Word[]> {
+    return fetch("/api/Scans/" + scanId + "/vectorize-batch", {
+        method: "POST",
+    }).then(function (response) {
+        if (!response.ok) {
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
+        }
+        return response.json() as Promise<Word[]>;
+    });
+}
+
+function removeWordFromLayout(lines: Word[][] | null, wordId: number): Word[][] | null {
+    if (!lines) {
+        return lines;
+    }
+    return lines
+        .map(function (line) {
+            return line.filter(function (word) { return word.id !== wordId; });
+        })
+        .filter(function (line) { return line.length > 0; });
 }
 
 function readError(response: Response): Promise<never> {
@@ -214,7 +310,76 @@ function App() {
     const [draggedWordId, setDraggedWordId] = useState<number | null>(null);
     const [dropTarget, setDropTarget] = useState<{ lineIndex: number; positionInLine: number } | null>(null);
     const [vectorizingWordId, setVectorizingWordId] = useState<number | null>(null);
+    const [isBatchVectorizing, setIsBatchVectorizing] = useState(false);
     const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null);
+    const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
+    const [scanItems, setScanItems] = useState<ScanListItem[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [listPage, setListPage] = useState(1);
+    const [listLoading, setListLoading] = useState(false);
+    const [listError, setListError] = useState<string | null>(null);
+    const [wordsOpenError, setWordsOpenError] = useState<string | null>(null);
+    const [isDeletingScan, setIsDeletingScan] = useState(false);
+    const [deleteScanStatus, setDeleteScanStatus] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const scanIdRef = useRef<number | null>(scanId);
+    scanIdRef.current = scanId;
+    /** Инкремент при смене скана/сбросе — отменяет устаревшие async-колбэки */
+    const editorGenerationRef = useRef(0);
+    const [brokenThumbnails, setBrokenThumbnails] = useState<Set<number>>(function () {
+        return new Set();
+    });
+
+    function resetEditorState() {
+        editorGenerationRef.current += 1;
+        setWords(null);
+        setLayoutLines(null);
+        setSavedLayoutSignature(null);
+        setRecognizeStatus(null);
+        setImageSize(null);
+        setDraft(null);
+        setSaveStatus(null);
+        setLayoutSaveStatus(null);
+        setDraggedWordId(null);
+        setDropTarget(null);
+        setVectorizingWordId(null);
+        setIsBatchVectorizing(false);
+        setVectorizeStatus(null);
+        setDeleteStatus(null);
+        setIsRecognizing(false);
+        setIsSaving(false);
+        setIsSavingLayout(false);
+        setWordsOpenError(null);
+        setDeleteScanStatus(null);
+    }
+
+    function clearToEmptyState() {
+        setScanId(null);
+        setSelectedFile(null);
+        setUploadStatus(null);
+        resetEditorState();
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    }
+
+    function loadScansPage(page: number) {
+        setListLoading(true);
+        setListError(null);
+        fetchScansPageWithRetry(page).then(function (data) {
+            setScanItems(data.items);
+            setTotalCount(data.totalCount);
+            setListError(null);
+        }).catch(function (error) {
+            setListError(error instanceof Error ? error.message : String(error));
+        }).finally(function () {
+            setListLoading(false);
+        });
+    }
+
+    useEffect(function () {
+        loadScansPage(listPage);
+    }, [listPage]);
 
     function syncLayoutFromWords(list: Word[]) {
         const layout = buildLayoutFromWords(list);
@@ -232,19 +397,7 @@ function App() {
     function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0] ?? null;
         setSelectedFile(file);
-        // Результат распознавания относится к прежнему скану, поэтому его нужно сбросить
-        setWords(null);
-        setLayoutLines(null);
-        setSavedLayoutSignature(null);
-        setRecognizeStatus(null);
-        setImageSize(null);
-        setDraft(null);
-        setSaveStatus(null);
-        setLayoutSaveStatus(null);
-        setDraggedWordId(null);
-        setDropTarget(null);
-        setVectorizingWordId(null);
-        setVectorizeStatus(null);
+        resetEditorState();
 
         if (file) {
             // Запрос для отправки файла на сервер
@@ -260,10 +413,71 @@ function App() {
             }).then(function (data) {
                 setScanId(data.id);
                 setUploadStatus("Загрузка завершена");
+                setListPage(1);
+                loadScansPage(1);
             }).catch(function (error) {
                 setUploadStatus("Ошибка загрузки: " + error.message);
             });
         }
+    }
+
+    function handleScanRowClick(id: number) {
+        resetEditorState();
+        setWordsOpenError(null);
+        setScanId(id);
+        const generation = editorGenerationRef.current;
+        fetchWords(id).then(function (list) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== id) {
+                return;
+            }
+            setWords(list);
+            syncLayoutFromWords(list);
+        }).catch(function (error) {
+            if (editorGenerationRef.current !== generation) {
+                return;
+            }
+            setWordsOpenError("Не удалось загрузить слова: " + error.message);
+        });
+    }
+
+    function handleDeleteScan(id: number, options?: { refreshList?: boolean }) {
+        if (isDeletingScan || isRecognizing || isBatchVectorizing || vectorizingWordId !== null) {
+            return;
+        }
+
+        setIsDeletingScan(true);
+        setDeleteScanStatus(null);
+
+        deleteScan(id).then(function () {
+            if (id === scanId) {
+                clearToEmptyState();
+            }
+
+            if (options?.refreshList) {
+                return fetchScansPageWithRetry(listPage).then(function (data) {
+                    setScanItems(data.items);
+                    setTotalCount(data.totalCount);
+                    setListError(null);
+                    if (data.items.length === 0 && listPage > 1) {
+                        setListPage(listPage - 1);
+                    }
+                }).catch(function (error) {
+                    setDeleteScanStatus(error instanceof Error ? error.message : String(error));
+                });
+            }
+        }).catch(function (error) {
+            setDeleteScanStatus(error instanceof Error ? error.message : String(error));
+        }).finally(function () {
+            setIsDeletingScan(false);
+        });
+    }
+
+    function handleThumbnailError(id: number) {
+        setBrokenThumbnails(function (current) {
+            const next = new Set(current);
+            next.add(id);
+            return next;
+        });
     }
 
     // Запрос на распознавание текста загруженного скана
@@ -290,7 +504,9 @@ function App() {
             setSaveStatus(null);
             setLayoutSaveStatus(null);
             setVectorizingWordId(null);
+            setIsBatchVectorizing(false);
             setVectorizeStatus(null);
+            setDeleteStatus(null);
             setRecognizeStatus("Распознавание завершено, слов: " + data.length);
         }).catch(function (error) {
             setRecognizeStatus("Ошибка распознавания: " + error.message);
@@ -300,14 +516,19 @@ function App() {
     }
 
     function handleVectorizeClick(word: Word) {
-        if (scanId === null || word.id === 0 || vectorizingWordId !== null) {
+        if (scanId === null || word.id === 0 || vectorizingWordId !== null || isBatchVectorizing) {
             return;
         }
 
+        const requestScanId = scanId;
+        const generation = editorGenerationRef.current;
         setVectorizingWordId(word.id);
         setVectorizeStatus("Векторизация слова…");
 
-        vectorizeWord(scanId, word.id).then(function (updated) {
+        vectorizeWord(requestScanId, word.id).then(function (updated) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
             setWords(function (current) {
                 if (!current) {
                     return current;
@@ -327,10 +548,78 @@ function App() {
             });
             setVectorizeStatus("Векторизация завершена");
         }).catch(function (error) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
             // Ошибка не очищает curvePoints / миниатюру уже векторизованного слова
             setVectorizeStatus("Ошибка векторизации: " + error.message);
         }).finally(function () {
-            setVectorizingWordId(null);
+            if (editorGenerationRef.current === generation) {
+                setVectorizingWordId(null);
+            }
+        });
+    }
+
+    function handleDeleteClick() {
+        if (scanId === null || draft === null || draft.id === 0) {
+            return;
+        }
+
+        const wordId = draft.id;
+        setDeleteStatus(null);
+
+        deleteWord(scanId, wordId).then(function () {
+            setWords(function (current) {
+                if (!current) {
+                    return current;
+                }
+                return current.filter(function (item) { return item.id !== wordId; });
+            });
+            setLayoutLines(function (lines) {
+                return removeWordFromLayout(lines, wordId);
+            });
+            setDraft(null);
+            setDraggedWordId(null);
+            setDropTarget(null);
+            setDeleteStatus(null);
+        }).catch(function (error) {
+            setDeleteStatus(error.message);
+        });
+    }
+
+    function handleBatchVectorizeClick() {
+        if (scanId === null || isBatchVectorizing || vectorizingWordId !== null) {
+            return;
+        }
+
+        const requestScanId = scanId;
+        const generation = editorGenerationRef.current;
+        setIsBatchVectorizing(true);
+        setVectorizeStatus("Пакетная векторизация…");
+
+        vectorizeBatch(requestScanId).then(function (data) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
+            setWords(data);
+            syncLayoutFromWords(data);
+            setDraft(function (current) {
+                if (!current) {
+                    return current;
+                }
+                const updated = data.find(function (item) { return item.id === current.id; });
+                return updated ? { ...current, ...updated } : current;
+            });
+            setVectorizeStatus("Пакетная векторизация завершена");
+        }).catch(function (error) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
+            setVectorizeStatus("Ошибка пакетной векторизации: " + error.message);
+        }).finally(function () {
+            if (editorGenerationRef.current === generation) {
+                setIsBatchVectorizing(false);
+            }
         });
     }
 
@@ -348,6 +637,7 @@ function App() {
         if (draft && draft.id === word.id) return;
         setDraft({ ...word });
         setSaveStatus(null);
+        setDeleteStatus(null);
     }
 
     // Слово создаётся не сразу: кнопка только открывает пустую форму, а запись
@@ -440,6 +730,7 @@ function App() {
 
     function handleDragOverWord(event: React.DragEvent, lineIndex: number, positionInLine: number) {
         event.preventDefault();
+        event.stopPropagation();
         event.dataTransfer.dropEffect = "move";
         if (draggedWordId === null) return;
         setDropTarget(function (current) {
@@ -560,54 +851,136 @@ function App() {
     const layoutDirty = savedLayoutSignature !== null &&
         effectiveLayout !== null &&
         layoutSignature(effectiveLayout) !== savedLayoutSignature;
+    const lastPage = Math.max(1, Math.ceil(totalCount / SCAN_PAGE_SIZE));
+    const isDeleteDisabled = isDeletingScan || isRecognizing || isBatchVectorizing || vectorizingWordId !== null;
 
     return (
         <div>
-            <input type="file" accept=".jpeg, .jpg, .png" onChange={handleFileChange} />
-            <p>Выбранный файл: {selectedFile ? selectedFile.name : "Не выбран"}</p>
-            <p>Статус: {uploadStatus}</p>
             {scanId ? (
                 // При изменении scanId запросятся данные изображения с сервера для этого id
-                <div className="scan">
-                    <img src={"/api/scans/" + scanId + "/image"} onLoad={handleImageLoad} />
-                    {imageSize ? (
-                        // viewBox переводит пиксели исходного изображения в текущий размер картинки,
-                        // поэтому масштаб рамок не нужно считать вручную
-                        <svg viewBox={"0 0 " + imageSize.width + " " + imageSize.height}>
-                            {words ? words.map(function (word) {
-                                const isSelected = draft !== null && draft.id === word.id;
-                                // У выбранного слова рамка рисуется по черновику,
-                                // чтобы правка координат была видна до сохранения
-                                const shown = isSelected ? draft : word;
+                <div className="workspace">
+                    <div className="scan">
+                        <img src={"/api/scans/" + scanId + "/image"} onLoad={handleImageLoad} />
+                        {imageSize ? (
+                            // viewBox переводит пиксели исходного изображения в текущий размер картинки,
+                            // поэтому масштаб рамок не нужно считать вручную
+                            <svg viewBox={"0 0 " + imageSize.width + " " + imageSize.height}>
+                                {words ? words.map(function (word) {
+                                    const isSelected = draft !== null && draft.id === word.id;
+                                    // У выбранного слова рамка рисуется по черновику,
+                                    // чтобы правка координат была видна до сохранения
+                                    const shown = isSelected ? draft : word;
 
-                                return (
-                                    <polygon
-                                        key={word.id}
-                                        className={isSelected ? "selected" : undefined}
-                                        points={boxPoints(shown)}
-                                        onClick={function () { handleWordSelect(word); }}
-                                    />
-                                );
-                            }) : null}
-                            {/* Несохранённого слова в списке ещё нет, поэтому его рамка
-                                рисуется отдельно: иначе вводить координаты пришлось бы наугад */}
-                            {draft && draft.id === 0 ? (
-                                <polygon className="selected" points={boxPoints(draft)} />
-                            ) : null}
-                        </svg>
-                    ) : null}
-                </div>
-            ) : null}
-            {scanId ? (
-                // Распознавать можно только уже загруженный скан
-                <div>
-                    <button type="button" onClick={handleRecognizeClick} disabled={isRecognizing}>
-                        {isRecognizing ? "Распознавание..." : "Распознать текст"}
-                    </button>
-                    <button type="button" onClick={handleAddClick} disabled={isSaving}>
-                        Добавить слово
-                    </button>
-                    <p>Статус распознавания: {recognizeStatus}</p>
+                                    return (
+                                        <polygon
+                                            key={word.id}
+                                            className={isSelected ? "selected" : undefined}
+                                            points={boxPoints(shown)}
+                                            onClick={function () { handleWordSelect(word); }}
+                                        />
+                                    );
+                                }) : null}
+                                {/* Несохранённого слова в списке ещё нет, поэтому его рамка
+                                    рисуется отдельно: иначе вводить координаты пришлось бы наугад */}
+                                {draft && draft.id === 0 ? (
+                                    <polygon className="selected" points={boxPoints(draft)} />
+                                ) : null}
+                            </svg>
+                        ) : null}
+                    </div>
+                    <div className="workspace-side">
+                        {displayLines && displayLines.length > 0 ? (
+                            <div className="recognized-text-block">
+                                <div className="layout-toolbar">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveLayoutClick}
+                                        disabled={isSavingLayout || !layoutDirty}
+                                    >
+                                        {isSavingLayout ? "Сохранение..." : "Сохранить порядок"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleBatchVectorizeClick}
+                                        disabled={isBatchVectorizing || vectorizingWordId !== null}
+                                    >
+                                        {isBatchVectorizing ? "Пакетная векторизация…" : "Векторизовать все слова"}
+                                    </button>
+                                    <p>{layoutSaveStatus}</p>
+                                    {vectorizeStatus ? <p>{vectorizeStatus}</p> : null}
+                                </div>
+                                <div className="recognized-text">
+                                {displayLines.map(function (lineWords, lineIndex) {
+                                    return (
+                                        <p
+                                            key={"line-" + lineIndex}
+                                            onDragOver={function (event) { handleDragOverLine(event, lineIndex); }}
+                                            onDrop={function (event) {
+                                                handleDrop(event, lineIndex, lineWords.length);
+                                            }}
+                                        >
+                                            {lineWords.map(function (word, positionInLine) {
+                                                const isSelected = draft !== null && draft.id === word.id;
+                                                const shown = isSelected ? draft : word;
+                                                const isDragging = draggedWordId === word.id;
+                                                const isDropTarget = dropTarget !== null &&
+                                                    dropTarget.lineIndex === lineIndex &&
+                                                    dropTarget.positionInLine === positionInLine;
+                                                const vectorizationClass = isWordVectorized(word)
+                                                    ? " vectorized"
+                                                    : " not-vectorized";
+
+                                                return (
+                                                    <span key={word.id}>
+                                                        {positionInLine > 0 ? " " : null}
+                                                        <span
+                                                            className={
+                                                                "word" +
+                                                                vectorizationClass +
+                                                                (isSelected ? " selected" : "") +
+                                                                (isDragging ? " dragging" : "") +
+                                                                (isDropTarget ? " drop-target" : "")
+                                                            }
+                                                            draggable={true}
+                                                            onDragStart={function (event) { handleDragStart(event, word); }}
+                                                            onDragEnd={handleDragEnd}
+                                                            onDragOver={function (event) {
+                                                                handleDragOverWord(event, lineIndex, positionInLine);
+                                                            }}
+                                                            onDrop={function (event) {
+                                                                event.stopPropagation();
+                                                                handleDrop(event, lineIndex, positionInLine);
+                                                            }}
+                                                            onClick={function () { handleWordSelect(word); }}
+                                                        >
+                                                            {shown.text || (word.id === 0 ? "…" : "")}
+                                                        </span>
+                                                    </span>
+                                                );
+                                            })}
+                                        </p>
+                                    );
+                                })}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        <button type="button" onClick={handleRecognizeClick} disabled={isRecognizing || isDeleteDisabled}>
+                            {isRecognizing ? "Распознавание..." : "Распознать текст"}
+                        </button>
+                        <button type="button" onClick={handleAddClick} disabled={isSaving || isDeleteDisabled}>
+                            Добавить слово
+                        </button>
+                        <button
+                            type="button"
+                            onClick={function () { handleDeleteScan(scanId!); }}
+                            disabled={isDeleteDisabled}
+                        >
+                            {isDeletingScan ? "Удаление..." : "Удалить скан"}
+                        </button>
+                        <p>Статус распознавания: {recognizeStatus}</p>
+                        {deleteScanStatus ? <p>{deleteScanStatus}</p> : null}
+                    </div>
                 </div>
             ) : null}
             {words && words.length > 0 && draft === null ? (
@@ -639,136 +1012,113 @@ function App() {
                             );
                         })}
                     </div>
+                    {isWordVectorized(draft) ? (
+                        <WordCurveThumbnail curvePoints={draft.curvePoints} />
+                    ) : null}
+                    <div className="editor-actions">
+                        {draft.id > 0 && !isWordVectorized(draft) ? (
+                            <button
+                                type="button"
+                                onClick={function () { handleVectorizeClick(draft); }}
+                                disabled={vectorizingWordId === draft.id || isBatchVectorizing}
+                            >
+                                {vectorizingWordId === draft.id ? "Векторизация…" : "Векторизовать"}
+                            </button>
+                        ) : null}
+                        {draft.id > 0 ? (
+                            <button type="button" onClick={handleDeleteClick}>
+                                Удалить слово
+                            </button>
+                        ) : null}
+                    </div>
                     <button type="button" onClick={handleSaveClick} disabled={isSaving}>
                         {isSaving ? "Сохранение..." : "Сохранить"}
                     </button>
                     <button type="button" onClick={handleCancelClick}>Отмена</button>
                     <p>{saveStatus}</p>
+                    {deleteStatus ? <p>{deleteStatus}</p> : null}
                 </div>
             ) : null}
-            {displayLines && displayLines.length > 0 ? (
-                <div className="recognized-text-block">
-                    <div className="layout-toolbar">
+            <section className="scans-section">
+                <table className="scans-table">
+                    <thead>
+                        <tr>
+                            <th>Миниатюра</th>
+                            <th>Id</th>
+                            <th className="scans-table-actions">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {scanItems.map(function (item) {
+                            return (
+                                <tr
+                                    key={item.id}
+                                    className={item.id === scanId ? "current" : undefined}
+                                    onClick={function () { handleScanRowClick(item.id); }}
+                                >
+                                    <td className="scans-table-thumbnail">
+                                        {brokenThumbnails.has(item.id) ? null : (
+                                            <img
+                                                src={"/api/Scans/" + item.id + "/thumbnail"}
+                                                alt=""
+                                                onError={function () { handleThumbnailError(item.id); }}
+                                            />
+                                        )}
+                                    </td>
+                                    <td>{item.id}</td>
+                                    <td className="scans-table-actions">
+                                        <button
+                                            type="button"
+                                            className="scans-table-delete"
+                                            disabled={isDeleteDisabled}
+                                            onClick={function (event) {
+                                                event.stopPropagation();
+                                                handleDeleteScan(item.id, { refreshList: true });
+                                            }}
+                                        >
+                                            Удалить
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                <div className="scans-pagination">
+                    <button
+                        type="button"
+                        disabled={listPage <= 1 || listLoading}
+                        onClick={function () { setListPage(listPage - 1); }}
+                    >
+                        Назад
+                    </button>
+                    <span>Страница {listPage} из {lastPage}</span>
+                    <button
+                        type="button"
+                        disabled={listPage >= lastPage || listLoading}
+                        onClick={function () { setListPage(listPage + 1); }}
+                    >
+                        Вперёд
+                    </button>
+                </div>
+                {listLoading ? <p>Загрузка списка…</p> : null}
+                {listError && !listLoading ? (
+                    <div className="scans-list-error">
+                        <p>{listError}</p>
                         <button
                             type="button"
-                            onClick={handleSaveLayoutClick}
-                            disabled={isSavingLayout || !layoutDirty}
+                            onClick={function () { loadScansPage(listPage); }}
                         >
-                            {isSavingLayout ? "Сохранение..." : "Сохранить порядок"}
+                            Повторить
                         </button>
-                        <p>{layoutSaveStatus}</p>
                     </div>
-                    <div className="recognized-text">
-                    {displayLines.map(function (lineWords, lineIndex) {
-                        return (
-                            <p
-                                key={"line-" + lineIndex}
-                                onDragOver={function (event) { handleDragOverLine(event, lineIndex); }}
-                                onDrop={function (event) {
-                                    handleDrop(event, lineIndex, lineWords.length);
-                                }}
-                            >
-                                {lineWords.map(function (word, positionInLine) {
-                                    const isSelected = draft !== null && draft.id === word.id;
-                                    const shown = isSelected ? draft : word;
-                                    const isDragging = draggedWordId === word.id;
-                                    const isDropTarget = dropTarget !== null &&
-                                        dropTarget.lineIndex === lineIndex &&
-                                        dropTarget.positionInLine === positionInLine;
-
-                                    return (
-                                        <span key={word.id}>
-                                            {positionInLine > 0 ? " " : null}
-                                            <span
-                                                className={
-                                                    "word" +
-                                                    (isSelected ? " selected" : "") +
-                                                    (isDragging ? " dragging" : "") +
-                                                    (isDropTarget ? " drop-target" : "")
-                                                }
-                                                draggable={true}
-                                                onDragStart={function (event) { handleDragStart(event, word); }}
-                                                onDragEnd={handleDragEnd}
-                                                onDragOver={function (event) {
-                                                    handleDragOverWord(event, lineIndex, positionInLine);
-                                                }}
-                                                onDrop={function (event) {
-                                                    handleDrop(event, lineIndex, positionInLine);
-                                                }}
-                                                onClick={function () { handleWordSelect(word); }}
-                                            >
-                                                {shown.text || (word.id === 0 ? "…" : "")}
-                                            </span>
-                                        </span>
-                                    );
-                                })}
-                            </p>
-                        );
-                    })}
-                    </div>
-                </div>
-            ) : null}
-            {scanId ? (
-                <section className="words-section" aria-label="Слова скана">
-                    <h2>Слова скана</h2>
-                    {isRecognizing ? (
-                        <p className="words-section-status">Загрузка слов…</p>
-                    ) : words === null ? (
-                        <p className="words-section-status">
-                            Слова появятся после распознавания или загрузки списка
-                        </p>
-                    ) : words.length === 0 ? (
-                        <p className="words-section-status">Нет слов</p>
-                    ) : (
-                        <table className="words-table">
-                            <thead>
-                                <tr>
-                                    <th>Текст</th>
-                                    <th>Статус</th>
-                                    <th>Миниатюра</th>
-                                    <th>Действие</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {words.map(function (word) {
-                                    const vectorized = isWordVectorized(word);
-                                    return (
-                                        <tr key={word.id === 0 ? "draft-" + word.orderIndex : word.id}>
-                                            <td>{word.text || (word.id === 0 ? "…" : "")}</td>
-                                            <td>
-                                                {vectorized ? "Векторизовано" : "Не векторизовано"}
-                                            </td>
-                                            <td className="word-curve-cell">
-                                                {vectorized
-                                                    ? <WordCurveThumbnail curvePoints={word.curvePoints} />
-                                                    : "—"}
-                                            </td>
-                                            <td>
-                                                {word.id === 0 ? (
-                                                    "—"
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={function () { handleVectorizeClick(word); }}
-                                                        disabled={vectorizingWordId === word.id}
-                                                    >
-                                                        {vectorizingWordId === word.id
-                                                            ? "Векторизация…"
-                                                            : "Векторизовать"}
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                    {vectorizeStatus ? (
-                        <p className="words-section-status">{vectorizeStatus}</p>
-                    ) : null}
-                </section>
-            ) : null}
+                ) : null}
+                {wordsOpenError ? <p>{wordsOpenError}</p> : null}
+                {deleteScanStatus && !scanId ? <p>{deleteScanStatus}</p> : null}
+            </section>
+            <input type="file" ref={fileInputRef} accept=".jpeg, .jpg, .png" onChange={handleFileChange} />
+            <p>Выбранный файл: {selectedFile ? selectedFile.name : "Не выбран"}</p>
+            <p>Статус: {uploadStatus}</p>
         </div>
     );
 }

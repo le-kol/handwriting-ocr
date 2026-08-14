@@ -9,9 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<WordVectorizationOptions>(
     builder.Configuration.GetSection(WordVectorizationOptions.SectionName));
+builder.Services.Configure<ScanListOptions>(
+    builder.Configuration.GetSection(ScanListOptions.SectionName));
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new Float3DJsonConverter()));
 builder.Services.AddScoped<ScanDbService>();
+builder.Services.AddScoped<ScanThumbnailService>();
 builder.Services.AddScoped<WordDbService>();
 builder.Services.AddScoped<FileStorageService>();
 builder.Services.AddScoped<WordFragmentExtractor>();
