@@ -79,5 +79,19 @@ namespace handwritingOCR.Server.Services
 
             return new ScanListPage { Items = items, TotalCount = totalCount };
         }
+
+        public async Task<string?> DeleteScanAsync(int id)
+        {
+            var connectionString = _configuration.GetConnectionString("Default");
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            const string deleteQuery = "DELETE FROM scans WHERE id = @id RETURNING path";
+
+            await using var command = new NpgsqlCommand(deleteQuery, connection);
+            command.Parameters.AddWithValue("id", id);
+            var path = await command.ExecuteScalarAsync();
+
+            return (string?)path;
+        }
     }
 }

@@ -186,6 +186,16 @@ namespace handwritingOCR.Server.Controllers
             }
         }
 
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteScan(int id)
+        {
+            string? path = await _scanDbService.DeleteScanAsync(id);
+            if (path == null) return NotFound("Не найдена запись в БД");
+
+            await _fileStorageService.DeleteFileIfExistsAsync(path);
+            return NoContent();
+        }
+
         [HttpDelete("{id}/words/{wordId}")]
         public async Task<IActionResult> DeleteWord(int id, int wordId)
         {

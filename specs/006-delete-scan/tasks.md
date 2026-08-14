@@ -26,7 +26,7 @@ Backend: `handwritingOCR.Server/`
 
 **Purpose**: Подтвердить brownfield-зависимости перед реализацией
 
-- [ ] T001 Confirm prerequisites: `ON DELETE CASCADE` on `words.scan_id` in `liquibase/changelog.sql`; `ScanDbService` (`GetScanPathAsync`, `InsertScanAsync`) in `handwritingOCR.Server/Services/ScanDbService.cs`; `FileStorageService` in `handwritingOCR.Server/Services/FileStorageService.cs`; `DELETE …/words/{wordId}` → `204 NoContent` in `handwritingOCR.Server/Controllers/ScansController.cs`; `resetEditorState()` and `loadScansPage` / `fetchScansPageWithRetry` in `handwritingocr.client/src/App.tsx` (фича `005-scans-table-thumbnails`)
+- [X] T001 Confirm prerequisites: `ON DELETE CASCADE` on `words.scan_id` in `liquibase/changelog.sql`; `ScanDbService` (`GetScanPathAsync`, `InsertScanAsync`) in `handwritingOCR.Server/Services/ScanDbService.cs`; `FileStorageService` in `handwritingOCR.Server/Services/FileStorageService.cs`; `DELETE …/words/{wordId}` → `204 NoContent` in `handwritingOCR.Server/Controllers/ScansController.cs`; `resetEditorState()` and `loadScansPage` / `fetchScansPageWithRetry` in `handwritingocr.client/src/App.tsx` (фича `005-scans-table-thumbnails`)
 
 ---
 
@@ -40,9 +40,9 @@ Backend: `handwritingOCR.Server/`
 
 **Independent Test**: quickstart §1–§3 — `DELETE` существующего id → 204; повторный GET image/words → 404; несуществующий id → 404 «Не найдена запись в БД»; запись есть, файл на диске удалён вручную → 204
 
-- [ ] T002 [P] [US3] Add `DeleteScanAsync(int id)` → `Task<string?>` in `handwritingOCR.Server/Services/ScanDbService.cs`: `DELETE FROM scans WHERE id = @id RETURNING path`; parameterized `@id`; return `path` or `null`; one pooled connection (`await using`); no separate DELETE on `words`
-- [ ] T003 [P] [US3] Add `DeleteFileIfExistsAsync(string path)` in `handwritingOCR.Server/Services/FileStorageService.cs`: if `!File.Exists(path)` return without error; else `File.Delete(path)`; do not throw for missing file
-- [ ] T004 [US3] Add `DELETE {id}` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/006-delete-scan/contracts/delete-scan.md`: `path = await DeleteScanAsync(id)` → `null` → `404` plain text «Не найдена запись в БД»; `await DeleteFileIfExistsAsync(path)`; `204 NoContent()`; no SQL in controller
+- [X] T002 [P] [US3] Add `DeleteScanAsync(int id)` → `Task<string?>` in `handwritingOCR.Server/Services/ScanDbService.cs`: `DELETE FROM scans WHERE id = @id RETURNING path`; parameterized `@id`; return `path` or `null`; one pooled connection (`await using`); no separate DELETE on `words`
+- [X] T003 [P] [US3] Add `DeleteFileIfExistsAsync(string path)` in `handwritingOCR.Server/Services/FileStorageService.cs`: if `!File.Exists(path)` return without error; else `File.Delete(path)`; do not throw for missing file
+- [X] T004 [US3] Add `DELETE {id}` to `handwritingOCR.Server/Controllers/ScansController.cs` per `specs/006-delete-scan/contracts/delete-scan.md`: `path = await DeleteScanAsync(id)` → `null` → `404` plain text «Не найдена запись в БД»; `await DeleteFileIfExistsAsync(path)`; `204 NoContent()`; no SQL in controller
 
 **Checkpoint**: Backend удаления готов; можно проверять curl/Swagger до UI
 
@@ -56,10 +56,10 @@ Backend: `handwritingOCR.Server/`
 
 ### Implementation for User Story 1
 
-- [ ] T005 [US1] Extend `resetEditorState()` in `handwritingocr.client/src/App.tsx`: also clear `isRecognizing`, `isSaving`, `isSavingLayout`, `wordsOpenError` (do **not** put `scanId` / upload fields here). Add `clearToEmptyState()` per `specs/006-delete-scan/contracts/delete-scan-ui.md`: `setScanId(null)`, `setSelectedFile(null)`, `setUploadStatus(null)`, then `resetEditorState()`; ref on file `<input type="file">` → `value = ""` for full FR-008 empty state
-- [ ] T006 [P] [US1] Add `deleteScan(id: number): Promise<void>` in `handwritingocr.client/src/App.tsx`: `DELETE /api/Scans/{id}`; success only on `204`; on `!ok` throw `Error(await response.text())`
-- [ ] T007 [US1] Add `isDeletingScan` state and `handleDeleteScan(id: number, options?: { refreshList?: boolean })` in `handwritingocr.client/src/App.tsx`: guard in-flight (`isDeletingScan`, recognize/batch/vectorize); `deleteScanStatus` on error (RU text, no UI reset on failure); on success if `id === scanId` → **`clearToEmptyState()`** (full reset incl. upload UI); if `options.refreshList` → defer list logic to US2 (T009); disable buttons while deleting
-- [ ] T008 [US1] Add «Удалить скан» button in `handwritingocr.client/src/App.tsx` `.workspace-side` next to «Распознать текст» and «Добавить слово»: render only when `scanId !== null`; `onClick={() => handleDeleteScan(scanId!)}` without confirm; disabled when `isDeletingScan` or recognize/batch/vectorize in progress; show `deleteScanStatus` near actions
+- [X] T005 [US1] Extend `resetEditorState()` in `handwritingocr.client/src/App.tsx`: also clear `isRecognizing`, `isSaving`, `isSavingLayout`, `wordsOpenError` (do **not** put `scanId` / upload fields here). Add `clearToEmptyState()` per `specs/006-delete-scan/contracts/delete-scan-ui.md`: `setScanId(null)`, `setSelectedFile(null)`, `setUploadStatus(null)`, then `resetEditorState()`; ref on file `<input type="file">` → `value = ""` for full FR-008 empty state
+- [X] T006 [P] [US1] Add `deleteScan(id: number): Promise<void>` in `handwritingocr.client/src/App.tsx`: `DELETE /api/Scans/{id}`; success only on `204`; on `!ok` throw `Error(await response.text())`
+- [X] T007 [US1] Add `isDeletingScan` state and `handleDeleteScan(id: number, options?: { refreshList?: boolean })` in `handwritingocr.client/src/App.tsx`: guard in-flight (`isDeletingScan`, recognize/batch/vectorize); `deleteScanStatus` on error (RU text, no UI reset on failure); on success if `id === scanId` → **`clearToEmptyState()`** (full reset incl. upload UI); if `options.refreshList` → defer list logic to US2 (T009); disable buttons while deleting
+- [X] T008 [US1] Add «Удалить скан» button in `handwritingocr.client/src/App.tsx` `.workspace-side` next to «Распознать текст» and «Добавить слово»: render only when `scanId !== null`; `onClick={() => handleDeleteScan(scanId!)}` without confirm; disabled when `isDeletingScan` or recognize/batch/vectorize in progress; show `deleteScanStatus` near actions
 
 **Checkpoint**: MVP — удаление открытого скана из редактора end-to-end (таблица может показывать устаревшую строку до листания — по spec)
 
@@ -73,9 +73,9 @@ Backend: `handwritingOCR.Server/`
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Complete list refresh in `handleDeleteScan` in `handwritingocr.client/src/App.tsx` when `options.refreshList === true`: after 204 call `fetchScansPageWithRetry(listPage)` (or `loadScansPage` with callback); if `items.length === 0` and `listPage > 1` → `setListPage(listPage - 1)`; if `id !== scanId` do not change editor state
-- [ ] T010 [US2] Add «Удалить» button per row in `handwritingocr.client/src/App.tsx` `.scans-table`: `onClick` with `e.stopPropagation()` then `handleDeleteScan(item.id, { refreshList: true })`; disabled when `isDeletingScan` or same in-flight guards as editor button
-- [ ] T011 [P] [US2] Add table delete column/cell styles in `handwritingocr.client/src/App.css` if needed (compact action column; button does not trigger row hover as link)
+- [X] T009 [US2] Complete list refresh in `handleDeleteScan` in `handwritingocr.client/src/App.tsx` when `options.refreshList === true`: after 204 call `fetchScansPageWithRetry(listPage)` (or `loadScansPage` with callback); if `items.length === 0` and `listPage > 1` → `setListPage(listPage - 1)`; if `id !== scanId` do not change editor state
+- [X] T010 [US2] Add «Удалить» button per row in `handwritingocr.client/src/App.tsx` `.scans-table`: `onClick` with `e.stopPropagation()` then `handleDeleteScan(item.id, { refreshList: true })`; disabled when `isDeletingScan` or same in-flight guards as editor button
+- [X] T011 [P] [US2] Add table delete column/cell styles in `handwritingocr.client/src/App.css` if needed (compact action column; button does not trigger row hover as link)
 
 **Checkpoint**: Оба пути удаления работают через один `handleDeleteScan`; таблица актуальна после delete из строки
 
@@ -85,10 +85,10 @@ Backend: `handwritingOCR.Server/`
 
 **Purpose**: Контракт, регрессии, полный quickstart
 
-- [ ] T012 Verify `DELETE {id}` in `handwritingOCR.Server/Controllers/ScansController.cs` + services match `specs/006-delete-scan/contracts/delete-scan.md` (`RETURNING path`, 404 text, 204, missing file on disk); fix gaps only
-- [ ] T013 Verify client flows in `handwritingocr.client/src/App.tsx` match `specs/006-delete-scan/contracts/delete-scan-ui.md` (single handler, no confirm, `clearToEmptyState` on current scan delete incl. upload UI, stopPropagation, 404 on double-click shows error without false success)
-- [ ] T014 Run manual scenarios in `specs/006-delete-scan/quickstart.md` (§1–§10); note any failures
-- [ ] T015 [P] Regression smoke: `GET /api/Scans?page=1`, `POST /api/Scans/upload`, `DELETE /api/Scans/{id}/words/{wordId}` still behave per prior features after scan delete shipped
+- [X] T012 Verify `DELETE {id}` in `handwritingOCR.Server/Controllers/ScansController.cs` + services match `specs/006-delete-scan/contracts/delete-scan.md` (`RETURNING path`, 404 text, 204, missing file on disk); fix gaps only
+- [X] T013 Verify client flows in `handwritingocr.client/src/App.tsx` match `specs/006-delete-scan/contracts/delete-scan-ui.md` (single handler, no confirm, `clearToEmptyState` on current scan delete incl. upload UI, stopPropagation, 404 on double-click shows error without false success)
+- [X] T014 Run manual scenarios in `specs/006-delete-scan/quickstart.md` (§1–§10); note any failures
+- [X] T015 [P] Regression smoke: `GET /api/Scans?page=1`, `POST /api/Scans/upload`, `DELETE /api/Scans/{id}/words/{wordId}` still behave per prior features after scan delete shipped
 
 ---
 

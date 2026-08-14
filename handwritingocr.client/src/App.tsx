@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { isWordVectorized } from './curvePoints';
 import WordCurveThumbnail from './WordCurveThumbnail';
@@ -235,6 +235,18 @@ function deleteWord(scanId: number, wordId: number): Promise<void> {
     });
 }
 
+function deleteScan(id: number): Promise<void> {
+    return fetch("/api/Scans/" + id, {
+        method: "DELETE",
+    }).then(function (response) {
+        if (response.status !== 204) {
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
+        }
+    });
+}
+
 function vectorizeBatch(scanId: number): Promise<Word[]> {
     return fetch("/api/Scans/" + scanId + "/vectorize-batch", {
         method: "POST",
@@ -307,6 +319,9 @@ function App() {
     const [listLoading, setListLoading] = useState(false);
     const [listError, setListError] = useState<string | null>(null);
     const [wordsOpenError, setWordsOpenError] = useState<string | null>(null);
+    const [isDeletingScan, setIsDeletingScan] = useState(false);
+    const [deleteScanStatus, setDeleteScanStatus] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [brokenThumbnails, setBrokenThumbnails] = useState<Set<number>>(function () {
         return new Set();
     });
@@ -326,6 +341,21 @@ function App() {
         setIsBatchVectorizing(false);
         setVectorizeStatus(null);
         setDeleteStatus(null);
+        setIsRecognizing(false);
+        setIsSaving(false);
+        setIsSavingLayout(false);
+        setWordsOpenError(null);
+        setDeleteScanStatus(null);
+    }
+
+    function clearToEmptyState() {
+        setScanId(null);
+        setSelectedFile(null);
+        setUploadStatus(null);
+        resetEditorState();
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     }
 
     function loadScansPage(page: number) {
@@ -395,6 +425,38 @@ function App() {
             syncLayoutFromWords(list);
         }).catch(function (error) {
             setWordsOpenError("Не удалось загрузить слова: " + error.message);
+        });
+    }
+
+    function handleDeleteScan(id: number, options?: { refreshList?: boolean }) {
+        if (isDeletingScan || isRecognizing || isBatchVectorizing || vectorizingWordId !== null) {
+            return;
+        }
+
+        setIsDeletingScan(true);
+        setDeleteScanStatus(null);
+
+        deleteScan(id).then(function () {
+            if (id === scanId) {
+                clearToEmptyState();
+            }
+
+            if (options?.refreshList) {
+                return fetchScansPageWithRetry(listPage).then(function (data) {
+                    setScanItems(data.items);
+                    setTotalCount(data.totalCount);
+                    setListError(null);
+                    if (data.items.length === 0 && listPage > 1) {
+                        setListPage(listPage - 1);
+                    }
+                }).catch(function (error) {
+                    setDeleteScanStatus(error instanceof Error ? error.message : String(error));
+                });
+            }
+        }).catch(function (error) {
+            setDeleteScanStatus(error instanceof Error ? error.message : String(error));
+        }).finally(function () {
+            setIsDeletingScan(false);
         });
     }
 
@@ -758,6 +820,7 @@ function App() {
         effectiveLayout !== null &&
         layoutSignature(effectiveLayout) !== savedLayoutSignature;
     const lastPage = Math.max(1, Math.ceil(totalCount / SCAN_PAGE_SIZE));
+    const isDeleteDisabled = isDeletingScan || isRecognizing || isBatchVectorizing || vectorizingWordId !== null;
 
     return (
         <div>
@@ -870,13 +933,21 @@ function App() {
                             </div>
                         ) : null}
 
-                        <button type="button" onClick={handleRecognizeClick} disabled={isRecognizing}>
+                        <button type="button" onClick={handleRecognizeClick} disabled={isRecognizing || isDeleteDisabled}>
                             {isRecognizing ? "Распознавание..." : "Распознать текст"}
                         </button>
-                        <button type="button" onClick={handleAddClick} disabled={isSaving}>
+                        <button type="button" onClick={handleAddClick} disabled={isSaving || isDeleteDisabled}>
                             Добавить слово
                         </button>
+                        <button
+                            type="button"
+                            onClick={function () { handleDeleteScan(scanId!); }}
+                            disabled={isDeleteDisabled}
+                        >
+                            {isDeletingScan ? "Удаление..." : "Удалить скан"}
+                        </button>
                         <p>Статус распознавания: {recognizeStatus}</p>
+                        {deleteScanStatus ? <p>{deleteScanStatus}</p> : null}
                     </div>
                 </div>
             ) : null}
@@ -942,6 +1013,7 @@ function App() {
                         <tr>
                             <th>Миниатюра</th>
                             <th>Id</th>
+                            <th className="scans-table-actions">Действия</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -962,6 +1034,19 @@ function App() {
                                         )}
                                     </td>
                                     <td>{item.id}</td>
+                                    <td className="scans-table-actions">
+                                        <button
+                                            type="button"
+                                            className="scans-table-delete"
+                                            disabled={isDeleteDisabled}
+                                            onClick={function (event) {
+                                                event.stopPropagation();
+                                                handleDeleteScan(item.id, { refreshList: true });
+                                            }}
+                                        >
+                                            Удалить
+                                        </button>
+                                    </td>
                                 </tr>
                             );
                         })}
@@ -997,8 +1082,9 @@ function App() {
                     </div>
                 ) : null}
                 {wordsOpenError ? <p>{wordsOpenError}</p> : null}
+                {deleteScanStatus && !scanId ? <p>{deleteScanStatus}</p> : null}
             </section>
-            <input type="file" accept=".jpeg, .jpg, .png" onChange={handleFileChange} />
+            <input type="file" ref={fileInputRef} accept=".jpeg, .jpg, .png" onChange={handleFileChange} />
             <p>Выбранный файл: {selectedFile ? selectedFile.name : "Не выбран"}</p>
             <p>Статус: {uploadStatus}</p>
         </div>
