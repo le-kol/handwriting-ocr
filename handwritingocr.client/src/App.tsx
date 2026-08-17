@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import './App.css';
 import { isWordVectorized } from './curvePoints';
 import WordCurveThumbnail from './WordCurveThumbnail';
@@ -110,6 +110,39 @@ function moveWordInLayout(
     const targetLine = next[targetLineIndex];
     const insertAt = Math.max(0, Math.min(targetPositionInLine, targetLine.length));
     targetLine.splice(insertAt, 0, moving);
+
+    return next.filter(function (line) { return line.length > 0; });
+}
+
+function moveWordToNewLine(
+    lines: Word[][],
+    wordId: number,
+    insertAtLineIndex: number
+): Word[][] {
+    const next = cloneLayout(lines);
+    let moving: Word | null = null;
+    let removedFromLineIndex = -1;
+
+    for (let lineIndex = 0; lineIndex < next.length; lineIndex++) {
+        const index = next[lineIndex].findIndex(function (word) { return word.id === wordId; });
+        if (index >= 0) {
+            moving = next[lineIndex][index];
+            next[lineIndex].splice(index, 1);
+            removedFromLineIndex = lineIndex;
+            break;
+        }
+    }
+
+    if (!moving) {
+        return next.filter(function (line) { return line.length > 0; });
+    }
+
+    let insertAt = insertAtLineIndex;
+    if (removedFromLineIndex >= 0 && removedFromLineIndex < insertAt) {
+        insertAt -= 1;
+    }
+
+    next.splice(insertAt, 0, [moving]);
 
     return next.filter(function (line) { return line.length > 0; });
 }
@@ -309,6 +342,7 @@ function App() {
     const [isSavingLayout, setIsSavingLayout] = useState(false);
     const [draggedWordId, setDraggedWordId] = useState<number | null>(null);
     const [dropTarget, setDropTarget] = useState<{ lineIndex: number; positionInLine: number } | null>(null);
+    const [gapDropTarget, setGapDropTarget] = useState<number | null>(null);
     const [vectorizingWordId, setVectorizingWordId] = useState<number | null>(null);
     const [isBatchVectorizing, setIsBatchVectorizing] = useState(false);
     const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null);
@@ -695,6 +729,7 @@ function App() {
         setSaveStatus(null);
         setDraggedWordId(null);
         setDropTarget(null);
+        setGapDropTarget(null);
         if (words) {
             syncLayoutFromWords(words);
             setLayoutSaveStatus(null);
@@ -713,12 +748,45 @@ function App() {
     function handleDragEnd() {
         setDraggedWordId(null);
         setDropTarget(null);
+        setGapDropTarget(null);
+    }
+
+    function handleGapDragOver(event: React.DragEvent, insertAtLineIndex: number) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = "move";
+        if (draggedWordId === null) return;
+        setDropTarget(null);
+        setGapDropTarget(function (current) {
+            if (current === insertAtLineIndex) return current;
+            return insertAtLineIndex;
+        });
+    }
+
+    function handleGapDrop(event: React.DragEvent, insertAtLineIndex: number) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (draggedWordId === null) return;
+
+        setLayoutLines(function (current) {
+            const base = current ?? (words ? buildLayoutFromWords(words) : null);
+            if (!base) return current;
+            return moveWordToNewLine(base, draggedWordId, insertAtLineIndex);
+        });
+        setDraft(function (current) {
+            if (!current || current.id !== draggedWordId) return current;
+            return { ...current };
+        });
+        setDraggedWordId(null);
+        setDropTarget(null);
+        setGapDropTarget(null);
     }
 
     function handleDragOverLine(event: React.DragEvent, lineIndex: number) {
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
         if (draggedWordId === null) return;
+        setGapDropTarget(null);
         setDropTarget(function (current) {
             const lineLength = layoutLines?.[lineIndex]?.length ?? 0;
             if (current?.lineIndex === lineIndex && current.positionInLine === lineLength) {
@@ -733,6 +801,7 @@ function App() {
         event.stopPropagation();
         event.dataTransfer.dropEffect = "move";
         if (draggedWordId === null) return;
+        setGapDropTarget(null);
         setDropTarget(function (current) {
             if (current?.lineIndex === lineIndex && current.positionInLine === positionInLine) {
                 return current;
@@ -756,6 +825,7 @@ function App() {
         });
         setDraggedWordId(null);
         setDropTarget(null);
+        setGapDropTarget(null);
     }
 
     // Сохраняется только текст и координаты; порядок слов — отдельной кнопкой
@@ -854,6 +924,19 @@ function App() {
     const lastPage = Math.max(1, Math.ceil(totalCount / SCAN_PAGE_SIZE));
     const isDeleteDisabled = isDeletingScan || isRecognizing || isBatchVectorizing || vectorizingWordId !== null;
 
+    function renderLineGap(insertAtLineIndex: number) {
+        const isActive = gapDropTarget === insertAtLineIndex && draggedWordId !== null;
+        return (
+            <div
+                key={"gap-" + insertAtLineIndex}
+                className={"line-gap-drop" + (isActive ? " active" : "")}
+                data-insert={insertAtLineIndex}
+                onDragOver={function (event) { handleGapDragOver(event, insertAtLineIndex); }}
+                onDrop={function (event) { handleGapDrop(event, insertAtLineIndex); }}
+            />
+        );
+    }
+
     return (
         <div>
             {scanId ? (
@@ -910,10 +993,11 @@ function App() {
                                     {vectorizeStatus ? <p>{vectorizeStatus}</p> : null}
                                 </div>
                                 <div className="recognized-text">
+                                {renderLineGap(0)}
                                 {displayLines.map(function (lineWords, lineIndex) {
                                     return (
+                                        <Fragment key={"line-block-" + lineIndex}>
                                         <p
-                                            key={"line-" + lineIndex}
                                             onDragOver={function (event) { handleDragOverLine(event, lineIndex); }}
                                             onDrop={function (event) {
                                                 handleDrop(event, lineIndex, lineWords.length);
@@ -959,6 +1043,8 @@ function App() {
                                                 );
                                             })}
                                         </p>
+                                        {renderLineGap(lineIndex + 1)}
+                                        </Fragment>
                                     );
                                 })}
                                 </div>

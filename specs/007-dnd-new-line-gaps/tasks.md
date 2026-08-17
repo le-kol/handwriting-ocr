@@ -24,7 +24,7 @@
 
 **Purpose**: Подтвердить brownfield drag-and-drop перед расширением gap-зонами
 
-- [ ] T001 Confirm existing DnD prerequisites in `handwritingocr.client/src/App.tsx`: `moveWordInLayout`, `layoutLines`, `dropTarget`, `draggedWordId`, `handleDragOverWord`, `handleDragOverLine`, `handleDrop`, `handleSaveLayoutClick`, and `.recognized-text` render per `specs/007-dnd-new-line-gaps/plan.md`
+- [X] T001 Confirm existing DnD prerequisites in `handwritingocr.client/src/App.tsx`: `moveWordInLayout`, `layoutLines`, `dropTarget`, `draggedWordId`, `handleDragOverWord`, `handleDragOverLine`, `handleDrop`, `handleSaveLayoutClick`, and `.recognized-text` render per `specs/007-dnd-new-line-gaps/plan.md`
 
 ---
 
@@ -34,11 +34,11 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 Implement `moveWordToNewLine(lines, wordId, insertAtLineIndex)` pure helper in `handwritingocr.client/src/App.tsx`: remove word, adjust insertAtLineIndex after removal, splice `[word]` at index, filter empty lines (see `specs/007-dnd-new-line-gaps/research.md` §2)
-- [ ] T003 Add `gapDropTarget: number | null` state in `handwritingocr.client/src/App.tsx` (insertAtLineIndex активной gap-зоны)
-- [ ] T004 Implement `handleGapDragOver(event, insertAtLineIndex)` and `handleGapDrop(event, insertAtLineIndex)` in `handwritingocr.client/src/App.tsx`: `preventDefault`, `stopPropagation`, update `gapDropTarget`, call `moveWordToNewLine` on drop, reset drag state
-- [ ] T005 Update `handleDragOverWord`, `handleDragOverLine`, `handleDragEnd`, and `handleCancelClick` in `handwritingocr.client/src/App.tsx` to clear `gapDropTarget` (mutual exclusion with `dropTarget` per `specs/007-dnd-new-line-gaps/data-model.md`)
-- [ ] T006 [P] Add `.line-gap-drop` (min-height ≥ 8px, margin) and `.line-gap-drop.active` horizontal line styles in `handwritingocr.client/src/App.css`; color aligned with `.word.drop-target` (`#1b7ff5`)
+- [X] T002 Implement `moveWordToNewLine(lines, wordId, insertAtLineIndex)` pure helper in `handwritingocr.client/src/App.tsx`: remove word, adjust insertAtLineIndex after removal, splice `[word]` at index, filter empty lines (see `specs/007-dnd-new-line-gaps/research.md` §2)
+- [X] T003 Add `gapDropTarget: number | null` state in `handwritingocr.client/src/App.tsx` (insertAtLineIndex активной gap-зоны)
+- [X] T004 Implement `handleGapDragOver(event, insertAtLineIndex)` and `handleGapDrop(event, insertAtLineIndex)` in `handwritingocr.client/src/App.tsx`: `preventDefault`, `stopPropagation`, update `gapDropTarget`, call `moveWordToNewLine` on drop, reset drag state
+- [X] T005 Update `handleDragOverWord`, `handleDragOverLine`, `handleDragEnd`, and `handleCancelClick` in `handwritingocr.client/src/App.tsx` to clear `gapDropTarget` (mutual exclusion with `dropTarget` per `specs/007-dnd-new-line-gaps/data-model.md`)
+- [X] T006 [P] Add `.line-gap-drop` (min-height ≥ 8px, margin) and `.line-gap-drop.active` horizontal line styles in `handwritingocr.client/src/App.css`; color aligned with `.word.drop-target` (`#1b7ff5`)
 
 **Checkpoint**: Helper и handlers готовы; JSX gap-зон можно подключать
 
@@ -52,8 +52,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Refactor `.recognized-text` render in `handwritingocr.client/src/App.tsx`: insert `.line-gap-drop` sibling with `insertAtLineIndex={0}` before the first `<p>`, wired to `handleGapDragOver` / `handleGapDrop`, class `active` when `gapDropTarget === 0`
-- [ ] T008 [US1] On gap drop at index 0 in `handwritingocr.client/src/App.tsx`, update `layoutLines` via `moveWordToNewLine` only (no fetch); confirm `layoutDirty` becomes true via existing `layoutSignature` / «Сохранить порядок» button state
+- [X] T007 [US1] Refactor `.recognized-text` render in `handwritingocr.client/src/App.tsx`: insert `.line-gap-drop` sibling with `insertAtLineIndex={0}` before the first `<p>`, wired to `handleGapDragOver` / `handleGapDrop`, class `active` when `gapDropTarget === 0`
+- [X] T008 [US1] On gap drop at index 0 in `handwritingocr.client/src/App.tsx`, update `layoutLines` via `moveWordToNewLine` only (no fetch); confirm `layoutDirty` becomes true via existing `layoutSignature` / «Сохранить порядок» button state
 
 **Checkpoint**: MVP — перенос слова на новую первую строку работает локально
 
@@ -67,8 +67,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Extend `.recognized-text` render loop in `handwritingocr.client/src/App.tsx`: after each `<p>` with `lineIndex === i`, render `.line-gap-drop` with `insertAtLineIndex={i + 1}` (covers gaps between lines; trailing gap for US3 uses `i + 1` when `i === N - 1`)
-- [ ] T010 [US2] Verify gap handlers in `handwritingocr.client/src/App.tsx` use `stopPropagation` on dragOver/drop so word and line targets are not triggered when dropping on gap (per `specs/007-dnd-new-line-gaps/contracts/dnd-line-gap-ui.md`)
+- [X] T009 [US2] Extend `.recognized-text` render loop in `handwritingocr.client/src/App.tsx`: after each `<p>` with `lineIndex === i`, render `.line-gap-drop` with `insertAtLineIndex={i + 1}` (covers gaps between lines; trailing gap for US3 uses `i + 1` when `i === N - 1`)
+- [X] T010 [US2] Verify gap handlers in `handwritingocr.client/src/App.tsx` use `stopPropagation` on dragOver/drop so word and line targets are not triggered when dropping on gap (per `specs/007-dnd-new-line-gaps/contracts/dnd-line-gap-ui.md`)
 
 **Checkpoint**: Межстрочные gap-drop работают; конфликтов с word/line drop нет
 
@@ -82,7 +82,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Confirm trailing `.line-gap-drop` with `insertAtLineIndex={displayLines.length}` renders after last `<p>` in `handwritingocr.client/src/App.tsx` and `moveWordToNewLine(..., N)` appends a one-word line at document end
+- [X] T011 [US3] Confirm trailing `.line-gap-drop` with `insertAtLineIndex={displayLines.length}` renders after last `<p>` in `handwritingocr.client/src/App.tsx` and `moveWordToNewLine(..., N)` appends a one-word line at document end
 
 **Checkpoint**: Все три позиции gap (начало / между / конец) функциональны
 
@@ -96,9 +96,9 @@
 
 ### Implementation for User Story 4
 
-- [ ] T012 [US4] Verify drop on `.word` in `handwritingocr.client/src/App.tsx` still calls `moveWordInLayout` (insert before target word); gap zones must not intercept when cursor is on word
-- [ ] T013 [US4] Verify drop on `<p>` (line area) in `handwritingocr.client/src/App.tsx` still appends to line end via `handleDrop(..., lineWords.length)`; `handleDragOverLine` clears `gapDropTarget`
-- [ ] T014 [US4] Verify `handleSaveLayoutClick` in `handwritingocr.client/src/App.tsx` sends `layoutToLineIds` with one-word inner arrays after gap-drop; RU messages («Порядок сохранён», «Сначала сохраните новое слово», etc.) unchanged; no backend changes
+- [X] T012 [US4] Verify drop on `.word` in `handwritingocr.client/src/App.tsx` still calls `moveWordInLayout` (insert before target word); gap zones must not intercept when cursor is on word
+- [X] T013 [US4] Verify drop on `<p>` (line area) in `handwritingocr.client/src/App.tsx` still appends to line end via `handleDrop(..., lineWords.length)`; `handleDragOverLine` clears `gapDropTarget`
+- [X] T014 [US4] Verify `handleSaveLayoutClick` in `handwritingocr.client/src/App.tsx` sends `layoutToLineIds` with one-word inner arrays after gap-drop; RU messages («Порядок сохранён», «Сначала сохраните новое слово», etc.) unchanged; no backend changes
 
 **Checkpoint**: 100% регрессионных сценариев DnD и save layout сохранены
 
@@ -108,8 +108,8 @@
 
 **Purpose**: Edge cases и приёмка по quickstart
 
-- [ ] T015 [P] Handle single-line document edge case in `handwritingocr.client/src/App.tsx`: only gaps at `insertAtLineIndex` 0 and 1 (no between-line gap when N=1) per spec edge cases
-- [ ] T016 Run manual validation scenarios from `specs/007-dnd-new-line-gaps/quickstart.md` §§1–9 against running SPA+API
+- [X] T015 [P] Handle single-line document edge case in `handwritingocr.client/src/App.tsx`: only gaps at `insertAtLineIndex` 0 and 1 (no between-line gap when N=1) per spec edge cases
+- [X] T016 Run manual validation scenarios from `specs/007-dnd-new-line-gaps/quickstart.md` §§1–9 against running SPA+API
 
 ---
 
