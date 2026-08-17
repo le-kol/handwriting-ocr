@@ -13,6 +13,7 @@
     max-width: 100%;
     min-width: 0;
     flex: 1 1 0;
+    user-select: none;
 }
 
 /* Картинка должна быть блочной: у строчной снизу остаётся отбивка под базовую
@@ -20,6 +21,8 @@
 .scan img {
     display: block;
     max-width: 100%;
+    user-select: none;
+    -webkit-user-drag: none;
 }
 
 /* Наложение повторяет размеры картинки, дальше координаты пересчитывает viewBox.
@@ -49,6 +52,21 @@
 .scan polygon.selected {
     stroke: #1b7ff5;
     stroke-width: 3;
+    fill: rgba(27, 127, 245, 0.08);
+    cursor: grab;
+}
+
+.scan polygon.selected.frame-dragging {
+    cursor: grabbing;
+}
+
+.scan .frame-handle {
+    fill: #1b7ff5;
+    stroke: #fff;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    pointer-events: all;
+    cursor: nwse-resize;
 }
 
 .editor {

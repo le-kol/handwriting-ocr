@@ -2,6 +2,15 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import './App.css';
 import { isWordVectorized } from './curvePoints';
 import WordCurveThumbnail from './WordCurveThumbnail';
+import {
+    coordinateFields,
+    FramePreviewScope,
+    initialFrameCoords,
+    useFramePreviewWord,
+    useWordFrameContext,
+    wordFrameContentBody,
+} from './wordFrame';
+import ScanFrameOverlay from './ScanFrameOverlay';
 
 // Слово скана в том виде, в котором его возвращает сервер.
 // Координаты — четыре вершины рамки в пикселях исходного изображения
@@ -31,18 +40,6 @@ const SCAN_PAGE_SIZE = 30;
 const SCANS_LIST_RETRY_ATTEMPTS = 5;
 const SCANS_LIST_RETRY_DELAY_MS = 1000;
 
-type CoordinateField = "x1" | "y1" | "x2" | "y2" | "x3" | "y3" | "x4" | "y4";
-
-const coordinateFields: CoordinateField[] = ["x1", "y1", "x2", "y2", "x3", "y3", "x4", "y4"];
-
-function boxPoints(word: Word) {
-    return word.x1 + "," + word.y1 + " " +
-        word.x2 + "," + word.y2 + " " +
-        word.x3 + "," + word.y3 + " " +
-        word.x4 + "," + word.y4;
-}
-
-// Слова группируются по lineIndex, внутри строки сортируются по orderIndex
 function groupWordsByLine(words: Word[]): Word[][] {
     const byLine = new Map<number, Word[]>();
 
@@ -155,6 +152,14 @@ function replaceWordIdInLayout(lines: Word[][], oldId: number, newId: number): W
     });
 }
 
+function applySavedWordToLayout(lines: Word[][], saved: Word): Word[][] {
+    return lines.map(function (line) {
+        return line.map(function (word) {
+            return word.id === saved.id ? { ...word, ...saved } : word;
+        });
+    });
+}
+
 function insertWordIntoLayout(lines: Word[][], word: Word, afterWordId: number | null): Word[][] {
     const next = cloneLayout(lines);
 
@@ -178,17 +183,7 @@ function insertWordIntoLayout(lines: Word[][], word: Word, afterWordId: number |
 
 function wordContentBody(word: Word) {
     // Сервер перезаписывает все поля контента разом, поэтому отправляем текст и координаты целиком
-    return {
-        text: word.text,
-        x1: word.x1,
-        y1: word.y1,
-        x2: word.x2,
-        y2: word.y2,
-        x3: word.x3,
-        y3: word.y3,
-        x4: word.x4,
-        y4: word.y4,
-    };
+    return wordFrameContentBody(word);
 }
 
 // После сохранения контента список перечитывается, но layoutLines не сбрасывается:
@@ -364,8 +359,20 @@ function App() {
         return new Set();
     });
 
+    const abortFrameDragRef = useRef<(() => void) | null>(null);
+    const commitPreviewRef = useRef<(() => Word | null) | null>(null);
+
+    function selectWord(word: Word) {
+        const canonical = words?.find(function (item) { return item.id === word.id; });
+        const next = canonical ? { ...canonical, text: word.text } : { ...word };
+        setDraft(next);
+        setSaveStatus(null);
+        setDeleteStatus(null);
+    }
+
     function resetEditorState() {
         editorGenerationRef.current += 1;
+        abortFrameDragRef.current?.();
         setWords(null);
         setLayoutLines(null);
         setSavedLayoutSignature(null);
@@ -535,6 +542,7 @@ function App() {
             // Распознавание удаляет прежние слова и вставляет новые, поэтому старые id
             // больше не существуют и черновик указывал бы на удалённое слово
             setDraft(null);
+            abortFrameDragRef.current?.();
             setSaveStatus(null);
             setLayoutSaveStatus(null);
             setVectorizingWordId(null);
@@ -669,13 +677,34 @@ function App() {
     function handleWordSelect(word: Word) {
         // Повторный клик по уже выбранному слову не должен отбрасывать начатые правки
         if (draft && draft.id === word.id) return;
-        setDraft({ ...word });
-        setSaveStatus(null);
-        setDeleteStatus(null);
+        abortFrameDragRef.current?.();
+        selectWord(word);
     }
 
-    // Слово создаётся не сразу: кнопка только открывает пустую форму, а запись
-    // в БД появляется при сохранении
+    function DraftCoordinateFields({ draftWord }: { draftWord: Word }) {
+        const shownDraft = useFramePreviewWord(draftWord)!;
+        const { handleCoordinateChange } = useWordFrameContext<Word>();
+
+        return (
+            <div className="coordinates">
+                {coordinateFields.map(function (field) {
+                    return (
+                        <label key={field}>
+                            {field}
+                            <input
+                                type="number"
+                                value={shownDraft[field]}
+                                onChange={function (event) {
+                                    handleCoordinateChange(field, event.target.value);
+                                }}
+                            />
+                        </label>
+                    );
+                })}
+            </div>
+        );
+    }
+
     function handleAddClick() {
         if (scanId === null) return;
 
@@ -688,10 +717,7 @@ function App() {
             // Скан сервер берёт из адреса запроса, значение из тела он игнорирует
             scanId,
             text: "",
-            x1: 0, y1: 0,
-            x2: 0, y2: 0,
-            x3: 0, y3: 0,
-            x4: 0, y4: 0,
+            ...initialFrameCoords(imageSize),
             orderIndex: 0,
             lineIndex: 0,
         };
@@ -718,13 +744,8 @@ function App() {
         });
     }
 
-    function handleCoordinateChange(field: CoordinateField, value: string) {
-        setDraft(function (current) {
-            return current ? { ...current, [field]: Number(value) } : current;
-        });
-    }
-
     function handleCancelClick() {
+        abortFrameDragRef.current?.();
         setDraft(null);
         setSaveStatus(null);
         setDraggedWordId(null);
@@ -830,21 +851,22 @@ function App() {
 
     // Сохраняется только текст и координаты; порядок слов — отдельной кнопкой
     function handleSaveClick() {
-        if (scanId === null || draft === null) return;
+        const toSave = commitPreviewRef.current?.() ?? draft;
+        if (scanId === null || toSave === null) return;
 
         setIsSaving(true);
         setSaveStatus("Сохранение");
 
-        const isNew = draft.id === 0;
+        const isNew = toSave.id === 0;
         // У слова без id записи в БД ещё нет, поэтому его создают, а не обновляют
         const url = isNew
             ? "/api/Scans/" + scanId + "/words"
-            : "/api/Scans/" + scanId + "/words/" + draft.id;
+            : "/api/Scans/" + scanId + "/words/" + toSave.id;
 
         fetch(url, {
             method: isNew ? "POST" : "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(wordContentBody(draft)),
+            body: JSON.stringify(wordContentBody(toSave)),
         }).then(function (response) {
             if (!response.ok) {
                 // Об ошибках сервер сообщает текстом, а не JSON
@@ -855,6 +877,8 @@ function App() {
             if (isNew && layoutLines) {
                 // БД выдала id; в локальной раскладке временный id=0 заменяется на настоящий
                 setLayoutLines(replaceWordIdInLayout(layoutLines, 0, saved.id));
+            } else if (layoutLines) {
+                setLayoutLines(applySavedWordToLayout(layoutLines, saved));
             }
             return fetchWords(scanId).then(function (list) {
                 setWords(list);
@@ -940,36 +964,24 @@ function App() {
     return (
         <div>
             {scanId ? (
-                // При изменении scanId запросятся данные изображения с сервера для этого id
+                <FramePreviewScope
+                    words={words}
+                    draft={draft}
+                    setDraft={setDraft}
+                    imageSize={imageSize}
+                    onSelectWord={selectWord}
+                    abortRef={abortFrameDragRef}
+                    commitRef={commitPreviewRef}
+                >
+                {/* При изменении scanId запросятся данные изображения с сервера для этого id */}
                 <div className="workspace">
                     <div className="scan">
-                        <img src={"/api/scans/" + scanId + "/image"} onLoad={handleImageLoad} />
-                        {imageSize ? (
-                            // viewBox переводит пиксели исходного изображения в текущий размер картинки,
-                            // поэтому масштаб рамок не нужно считать вручную
-                            <svg viewBox={"0 0 " + imageSize.width + " " + imageSize.height}>
-                                {words ? words.map(function (word) {
-                                    const isSelected = draft !== null && draft.id === word.id;
-                                    // У выбранного слова рамка рисуется по черновику,
-                                    // чтобы правка координат была видна до сохранения
-                                    const shown = isSelected ? draft : word;
-
-                                    return (
-                                        <polygon
-                                            key={word.id}
-                                            className={isSelected ? "selected" : undefined}
-                                            points={boxPoints(shown)}
-                                            onClick={function () { handleWordSelect(word); }}
-                                        />
-                                    );
-                                }) : null}
-                                {/* Несохранённого слова в списке ещё нет, поэтому его рамка
-                                    рисуется отдельно: иначе вводить координаты пришлось бы наугад */}
-                                {draft && draft.id === 0 ? (
-                                    <polygon className="selected" points={boxPoints(draft)} />
-                                ) : null}
-                            </svg>
-                        ) : null}
+                        <img
+                            src={"/api/scans/" + scanId + "/image"}
+                            onLoad={handleImageLoad}
+                            draggable={false}
+                        />
+                        <ScanFrameOverlay words={words} draft={draft} imageSize={imageSize} />
                     </div>
                     <div className="workspace-side">
                         {displayLines && displayLines.length > 0 ? (
@@ -1068,62 +1080,48 @@ function App() {
                         {deleteScanStatus ? <p>{deleteScanStatus}</p> : null}
                     </div>
                 </div>
+                {draft ? (
+                    <div className="editor">
+                        <p>
+                            {draft.id === 0
+                                ? "Новое слово на позицию " + draft.orderIndex
+                                : "Слово на позиции " + draft.orderIndex}
+                        </p>
+                        <label>
+                            Текст <input value={draft.text} onChange={handleTextChange} />
+                        </label>
+                        <DraftCoordinateFields draftWord={draft} />
+                        {isWordVectorized(draft) ? (
+                            <WordCurveThumbnail curvePoints={draft.curvePoints} />
+                        ) : null}
+                        <div className="editor-actions">
+                            {draft.id > 0 && !isWordVectorized(draft) ? (
+                                <button
+                                    type="button"
+                                    onClick={function () { handleVectorizeClick(draft); }}
+                                    disabled={vectorizingWordId === draft.id || isBatchVectorizing}
+                                >
+                                    {vectorizingWordId === draft.id ? "Векторизация…" : "Векторизовать"}
+                                </button>
+                            ) : null}
+                            {draft.id > 0 ? (
+                                <button type="button" onClick={handleDeleteClick}>
+                                    Удалить слово
+                                </button>
+                            ) : null}
+                        </div>
+                        <button type="button" onClick={handleSaveClick} disabled={isSaving}>
+                            {isSaving ? "Сохранение..." : "Сохранить"}
+                        </button>
+                        <button type="button" onClick={handleCancelClick}>Отмена</button>
+                        <p>{saveStatus}</p>
+                        {deleteStatus ? <p>{deleteStatus}</p> : null}
+                    </div>
+                ) : null}
+                </FramePreviewScope>
             ) : null}
             {words && words.length > 0 && draft === null ? (
                 <p>Выберите слово в тексте или рамку на скане, чтобы отредактировать</p>
-            ) : null}
-            {draft ? (
-                <div className="editor">
-                    <p>
-                        {draft.id === 0
-                            ? "Новое слово на позицию " + draft.orderIndex
-                            : "Слово на позиции " + draft.orderIndex}
-                    </p>
-                    <label>
-                        Текст <input value={draft.text} onChange={handleTextChange} />
-                    </label>
-                    <div className="coordinates">
-                        {coordinateFields.map(function (field) {
-                            return (
-                                <label key={field}>
-                                    {field}
-                                    <input
-                                        type="number"
-                                        value={draft[field]}
-                                        onChange={function (event) {
-                                            handleCoordinateChange(field, event.target.value);
-                                        }}
-                                    />
-                                </label>
-                            );
-                        })}
-                    </div>
-                    {isWordVectorized(draft) ? (
-                        <WordCurveThumbnail curvePoints={draft.curvePoints} />
-                    ) : null}
-                    <div className="editor-actions">
-                        {draft.id > 0 && !isWordVectorized(draft) ? (
-                            <button
-                                type="button"
-                                onClick={function () { handleVectorizeClick(draft); }}
-                                disabled={vectorizingWordId === draft.id || isBatchVectorizing}
-                            >
-                                {vectorizingWordId === draft.id ? "Векторизация…" : "Векторизовать"}
-                            </button>
-                        ) : null}
-                        {draft.id > 0 ? (
-                            <button type="button" onClick={handleDeleteClick}>
-                                Удалить слово
-                            </button>
-                        ) : null}
-                    </div>
-                    <button type="button" onClick={handleSaveClick} disabled={isSaving}>
-                        {isSaving ? "Сохранение..." : "Сохранить"}
-                    </button>
-                    <button type="button" onClick={handleCancelClick}>Отмена</button>
-                    <p>{saveStatus}</p>
-                    {deleteStatus ? <p>{deleteStatus}</p> : null}
-                </div>
             ) : null}
             <section className="scans-section">
                 <table className="scans-table">

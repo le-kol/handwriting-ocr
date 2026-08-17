@@ -24,7 +24,7 @@
 
 **Purpose**: Подтвердить brownfield SVG overlay и draft-редактирование перед frame drag
 
-- [ ] T001 Confirm existing frame-edit prerequisites in `handwritingocr.client/src/App.tsx`: `Word` x1–y4, `boxPoints`, `draft`, `imageSize`, `handleWordSelect`, `handleCoordinateChange`, `handleSaveClick`, `wordContentBody`, SVG overlay with `viewBox` and `onClick` on polygons per `specs/008-dnd-word-frame-edit/plan.md`
+- [X] T001 Confirm existing frame-edit prerequisites in `handwritingocr.client/src/App.tsx`: `Word` x1–y4, `boxPoints`, `draft`, `imageSize`, `handleWordSelect`, `handleCoordinateChange`, `handleSaveClick`, `wordContentBody`, SVG overlay with `viewBox` and `onClick` on polygons per `specs/008-dnd-word-frame-edit/plan.md`
 
 ---
 
@@ -34,12 +34,12 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 [P] Create `handwritingocr.client/src/frameEdit.ts` with pure helpers: `defaultCenterFrame(w, h)` (80×40 centered), `translateFrame(word, dx, dy)`, `setCorner(word, index, x, y)`, `clientToImagePoint(svg, clientX, clientY)`, `pointInQuad(px, py, word)`, `findWordAtPoint(words, draft, px, py)` returning min `orderIndex` hit per `specs/008-dnd-word-frame-edit/research.md`
-- [ ] T003 Add `frameDrag: { mode: 'move' | 'corner'; cornerIndex?: number; startImageX: number; startImageY: number; snapshot: Word } | null` state and import from `frameEdit.ts` in `handwritingocr.client/src/App.tsx`
-- [ ] T004 Replace polygon `onClick`-only selection in `handwritingocr.client/src/App.tsx` with `onMouseDown` on scan overlay using `findWordAtPoint`: if word not selected → `handleWordSelect` only (no coord change on move before mouseup); if already selected → defer to frame drag handlers (FR-003)
-- [ ] T005 Implement window `mousemove`/`mouseup` listener attach/detach in `handwritingocr.client/src/App.tsx` during active `frameDrag`; cleanup on mouseup, `handleCancelClick`, and unmount
-- [ ] T006 [P] Add `.frame-handle` styles and selected polygon interior hit-area (`fill: transparent` or rgba) plus `cursor: grab`/`grabbing` in `handwritingocr.client/src/App.css` per `specs/008-dnd-word-frame-edit/contracts/frame-drag-ui.md`
-- [ ] T007 Render four `<circle class="frame-handle">` on selected `draft` vertices in SVG block of `handwritingocr.client/src/App.tsx` (visual + pointer-events; drag wiring in US1/US2)
+- [X] T002 [P] Create `handwritingocr.client/src/frameEdit.ts` with pure helpers: `defaultCenterFrame(w, h)` (80×40 centered), `translateFrame(word, dx, dy)`, `setCorner(word, index, x, y)`, `clientToImagePoint(svg, clientX, clientY)`, `pointInQuad(px, py, word)`, `findWordAtPoint(words, draft, px, py)` returning min `orderIndex` hit per `specs/008-dnd-word-frame-edit/research.md`
+- [X] T003 Add `frameDrag: { mode: 'move' | 'corner'; cornerIndex?: number; startImageX: number; startImageY: number; snapshot: Word } | null` state and import from `frameEdit.ts` in `handwritingocr.client/src/App.tsx`
+- [X] T004 Replace polygon `onClick`-only selection in `handwritingocr.client/src/App.tsx` with `onMouseDown` on scan overlay using `findWordAtPoint`: if word not selected → `handleWordSelect` only (no coord change on move before mouseup); if already selected → defer to frame drag handlers (FR-003)
+- [X] T005 Implement window `mousemove`/`mouseup` listener attach/detach in `handwritingocr.client/src/App.tsx` during active `frameDrag`; cleanup on mouseup, `handleCancelClick`, and unmount
+- [X] T006 [P] Add `.frame-handle` styles and selected polygon interior hit-area (`fill: transparent` or rgba) plus `cursor: grab`/`grabbing` in `handwritingocr.client/src/App.css` per `specs/008-dnd-word-frame-edit/contracts/frame-drag-ui.md`
+- [X] T007 Render four `<circle class="frame-handle">` on selected `draft` vertices in SVG block of `handwritingocr.client/src/App.tsx` (visual + pointer-events; drag wiring in US1/US2)
 
 **Checkpoint**: Helpers, state, selection без drag, handles visible — можно подключать move/corner drag
 
@@ -53,9 +53,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] On `mousedown` of selected polygon interior (not handle) in `handwritingocr.client/src/App.tsx`, start `frameDrag` with `mode: 'move'` and `snapshot` copy of `draft`; record `startImageX/Y` via `clientToImagePoint`
-- [ ] T009 [US1] On window `mousemove` during move drag in `handwritingocr.client/src/App.tsx`, update `draft` via `translateFrame(snapshot, dx, dy)` with `Math.round` on all coordinates; do not mutate `layoutLines` or call API (FR-001, FR-005, FR-006)
-- [ ] T010 [US1] On window `mouseup` in `handwritingocr.client/src/App.tsx`, clear `frameDrag`; verify controlled `<input type="number">` fields x1–y4 reflect `draft` during and after drag
+- [X] T008 [US1] On `mousedown` of selected polygon interior (not handle) in `handwritingocr.client/src/App.tsx`, start `frameDrag` with `mode: 'move'` and `snapshot` copy of `draft`; record `startImageX/Y` via `clientToImagePoint`
+- [X] T009 [US1] On window `mousemove` during move drag in `handwritingocr.client/src/App.tsx`, update `draft` via `translateFrame(snapshot, dx, dy)` with `Math.round` on all coordinates; do not mutate `layoutLines` or call API (FR-001, FR-005, FR-006)
+- [X] T010 [US1] On window `mouseup` in `handwritingocr.client/src/App.tsx`, clear `frameDrag`; verify controlled `<input type="number">` fields x1–y4 reflect `draft` during and after drag
 
 **Checkpoint**: MVP — перемещение рамки целиком с live sync; без автосохранения
 
@@ -69,9 +69,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] Wire `onMouseDown` on each `.frame-handle` in `handwritingocr.client/src/App.tsx` to start `frameDrag` with `mode: 'corner'` and `cornerIndex` 0–3; must run before interior move handler (FR-001a)
-- [ ] T012 [US2] On window `mousemove` during corner drag in `handwritingocr.client/src/App.tsx`, update `draft` via `setCorner(snapshot, cornerIndex, x, y)` with rounded image-space cursor position
-- [ ] T013 [US2] Verify corner-vs-move priority at handle boundary in `handwritingocr.client/src/App.tsx`: mousedown on handle always corner drag; mousedown on interior never moves a corner (quickstart §4)
+- [X] T011 [US2] Wire `onMouseDown` on each `.frame-handle` in `handwritingocr.client/src/App.tsx` to start `frameDrag` with `mode: 'corner'` and `cornerIndex` 0–3; must run before interior move handler (FR-001a)
+- [X] T012 [US2] On window `mousemove` during corner drag in `handwritingocr.client/src/App.tsx`, update `draft` via `setCorner(snapshot, cornerIndex, x, y)` with rounded image-space cursor position
+- [X] T013 [US2] Verify corner-vs-move priority at handle boundary in `handwritingocr.client/src/App.tsx`: mousedown on handle always corner drag; mousedown on interior never moves a corner (quickstart §4)
 
 **Checkpoint**: Move и corner drag оба работают с приоритетом углов
 
@@ -85,8 +85,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T014 [US3] Update `handleAddClick` in `handwritingocr.client/src/App.tsx` to set initial coords via `defaultCenterFrame(imageSize.width, imageSize.height)` when `imageSize` available; if add before image load, apply center frame when `imageSize` becomes available for id=0 draft
-- [ ] T015 [US3] Ensure id=0 `<polygon class="selected">` and four handles in `handwritingocr.client/src/App.tsx` support move/corner drag same as saved words; POST via existing `handleSaveClick` sends dragged coords
+- [X] T014 [US3] Update `handleAddClick` in `handwritingocr.client/src/App.tsx` to set initial coords via `defaultCenterFrame(imageSize.width, imageSize.height)` when `imageSize` available; if add before image load, apply center frame when `imageSize` becomes available for id=0 draft
+- [X] T015 [US3] Ensure id=0 `<polygon class="selected">` and four handles in `handwritingocr.client/src/App.tsx` support move/corner drag same as saved words; POST via existing `handleSaveClick` sends dragged coords
 
 **Checkpoint**: Новое слово с осмысленной начальной рамкой, не (0,0) degenerate
 
@@ -100,11 +100,11 @@
 
 ### Implementation for User Story 4
 
-- [ ] T016 [US4] Verify `handleCoordinateChange` in `handwritingocr.client/src/App.tsx` still updates selected polygon live (numeric → scan); frame drag → numeric remains bidirectional (FR-009)
-- [ ] T017 [US4] Verify `findWordAtPoint` min `orderIndex` selection on overlapping quads in `handwritingocr.client/src/App.tsx` (FR-003a; quickstart §6)
-- [ ] T018 [US4] Verify HTML5 text DnD in `.recognized-text` (`handleDragStart`, gap/word/line handlers) unchanged in `handwritingocr.client/src/App.tsx`; frame edit uses mouse events only on SVG (FR-011)
-- [ ] T019 [US4] Verify `handleSaveLayoutClick` in `handwritingocr.client/src/App.tsx` does not send frame-draft coords; `handleSaveClick` still uses `wordContentBody(draft)` for POST/PUT; RU statuses unchanged (FR-010, FR-012, FR-013)
-- [ ] T020 [US4] Update `handleCancelClick` in `handwritingocr.client/src/App.tsx` to abort active `frameDrag` and reset listeners before clearing `draft` (FR-007)
+- [X] T016 [US4] Verify `handleCoordinateChange` in `handwritingocr.client/src/App.tsx` still updates selected polygon live (numeric → scan); frame drag → numeric remains bidirectional (FR-009)
+- [X] T017 [US4] Verify `findWordAtPoint` min `orderIndex` selection on overlapping quads in `handwritingocr.client/src/App.tsx` (FR-003a; quickstart §6)
+- [X] T018 [US4] Verify HTML5 text DnD in `.recognized-text` (`handleDragStart`, gap/word/line handlers) unchanged in `handwritingocr.client/src/App.tsx`; frame edit uses mouse events only on SVG (FR-011)
+- [X] T019 [US4] Verify `handleSaveLayoutClick` in `handwritingocr.client/src/App.tsx` does not send frame-draft coords; `handleSaveClick` still uses `wordContentBody(draft)` for POST/PUT; RU statuses unchanged (FR-010, FR-012, FR-013)
+- [X] T020 [US4] Update `handleCancelClick` in `handwritingocr.client/src/App.tsx` to abort active `frameDrag` and reset listeners before clearing `draft` (FR-007)
 
 **Checkpoint**: Регрессии DnD текста, save layout, numeric sync — пройдены
 
@@ -114,7 +114,7 @@
 
 **Purpose**: Edge cases и приёмка по quickstart
 
-- [ ] T021 [P] Handle edge cases in `handwritingocr.client/src/App.tsx`: mousedown on unselected frame with mouse move selects only; zero-move mouseup leaves coords unchanged; abort drag if selection changes mid-drag per spec edge cases
+- [X] T021 [P] Handle edge cases in `handwritingocr.client/src/App.tsx`: mousedown on unselected frame with mouse move selects only; zero-move mouseup leaves coords unchanged; abort drag if selection changes mid-drag per spec edge cases
 - [ ] T022 Run manual validation scenarios from `specs/008-dnd-word-frame-edit/quickstart.md` §§1–10 against running SPA+API
 
 ---
