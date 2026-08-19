@@ -193,7 +193,7 @@ export function findWordAtPoint(
         }
     }
 
-    if (draft !== null && draft.id === 0 && pointInQuad(px, py, draft)) {
+    if (draft !== null && draft.id <= 0 && pointInQuad(px, py, draft)) {
         hits.push(draft);
     }
 
@@ -211,7 +211,7 @@ export function resolveTargetWord<T extends WordLike>(
     draft: T | null,
     hitWord: WordLike
 ): T | null {
-    if (hitWord.id === 0 && draft !== null && draft.id === 0) {
+    if (hitWord.id <= 0 && draft !== null && draft.id === hitWord.id) {
         return draft;
     }
     return words.find(function (word) { return word.id === hitWord.id; }) ?? null;
@@ -394,12 +394,12 @@ export function useWordFrame<T extends WordLike>({
     }
 
     useEffect(function () {
-        if (!draft || draft.id !== 0 || !imageSize || !isDegenerateFrame(draft)) {
+        if (!draft || draft.id > 0 || !imageSize || !isDegenerateFrame(draft)) {
             return;
         }
 
         setDraft(function (current) {
-            if (!current || current.id !== 0) {
+            if (!current || current.id > 0) {
                 return current;
             }
             return { ...current, ...defaultCenterFrame(imageSize.width, imageSize.height) };

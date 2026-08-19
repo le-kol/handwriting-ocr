@@ -11,6 +11,14 @@ import {
     wordFrameContentBody,
 } from './wordFrame';
 import ScanFrameOverlay from './ScanFrameOverlay';
+import InlineWordInput from './InlineWordInput';
+import {
+    caretIndexFromClick,
+    distanceExceeded,
+    isUnsavedWordId,
+    lastSavedTextForWord,
+    type PendingWordGesture,
+} from './inlineWordEdit';
 
 // Слово скана в том виде, в котором его возвращает сервер.
 // Координаты — четыре вершины рамки в пикселях исходного изображения
@@ -160,6 +168,19 @@ function applySavedWordToLayout(lines: Word[][], saved: Word): Word[][] {
     });
 }
 
+function findWordInLayout(lines: Word[][] | null, wordId: number): Word | null {
+    if (!lines) {
+        return null;
+    }
+    for (const line of lines) {
+        const found = line.find(function (word) { return word.id === wordId; });
+        if (found) {
+            return found;
+        }
+    }
+    return null;
+}
+
 function insertWordIntoLayout(lines: Word[][], word: Word, afterWordId: number | null): Word[][] {
     const next = cloneLayout(lines);
 
@@ -299,6 +320,14 @@ function removeWordFromLayout(lines: Word[][] | null, wordId: number): Word[][] 
         .filter(function (line) { return line.length > 0; });
 }
 
+function revertLayoutWordText(lines: Word[][], wordId: number, text: string): Word[][] {
+    return lines.map(function (line) {
+        return line.map(function (word) {
+            return word.id === wordId ? { ...word, text } : word;
+        });
+    });
+}
+
 function readError(response: Response): Promise<never> {
     return response.text().then(function (message) {
         throw new Error(message || String(response.status));
@@ -331,6 +360,8 @@ function App() {
     // Правки выбранного слова. id внутри черновика заодно говорит, какое слово выбрано,
     // поэтому отдельного состояния для выбора нет и разойтись им негде
     const [draft, setDraft] = useState<Word | null>(null);
+    const [inlineEditingWordId, setInlineEditingWordId] = useState<number | null>(null);
+    const [pendingWordGesture, setPendingWordGesture] = useState<PendingWordGesture | null>(null);
     const [saveStatus, setSaveStatus] = useState<string | null>(null);
     const [layoutSaveStatus, setLayoutSaveStatus] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -361,6 +392,18 @@ function App() {
 
     const abortFrameDragRef = useRef<(() => void) | null>(null);
     const commitPreviewRef = useRef<(() => Word | null) | null>(null);
+    const inlineInputRef = useRef<HTMLInputElement | null>(null);
+    const pendingCaretRef = useRef<{ x: number; y: number } | null>(null);
+    const isCommittingInlineRef = useRef(false);
+    const nextTempWordIdRef = useRef(-1);
+    const draftRef = useRef(draft);
+    draftRef.current = draft;
+    const wordsRef = useRef(words);
+    wordsRef.current = words;
+    const layoutLinesRef = useRef(layoutLines);
+    layoutLinesRef.current = layoutLines;
+    const inlineEditingWordIdRef = useRef(inlineEditingWordId);
+    inlineEditingWordIdRef.current = inlineEditingWordId;
 
     function selectWord(word: Word) {
         const canonical = words?.find(function (item) { return item.id === word.id; });
@@ -372,6 +415,7 @@ function App() {
 
     function resetEditorState() {
         editorGenerationRef.current += 1;
+        nextTempWordIdRef.current = -1;
         abortFrameDragRef.current?.();
         setWords(null);
         setLayoutLines(null);
@@ -379,6 +423,8 @@ function App() {
         setRecognizeStatus(null);
         setImageSize(null);
         setDraft(null);
+        setInlineEditingWordId(null);
+        setPendingWordGesture(null);
         setSaveStatus(null);
         setLayoutSaveStatus(null);
         setDraggedWordId(null);
@@ -558,7 +604,7 @@ function App() {
     }
 
     function handleVectorizeClick(word: Word) {
-        if (scanId === null || word.id === 0 || vectorizingWordId !== null || isBatchVectorizing) {
+        if (scanId === null || isUnsavedWordId(word.id) || vectorizingWordId !== null || isBatchVectorizing) {
             return;
         }
 
@@ -603,7 +649,7 @@ function App() {
     }
 
     function handleDeleteClick() {
-        if (scanId === null || draft === null || draft.id === 0) {
+        if (scanId === null || draft === null || isUnsavedWordId(draft.id)) {
             return;
         }
 
@@ -674,11 +720,236 @@ function App() {
         });
     }
 
+    function clearInlineEditing() {
+        inlineEditingWordIdRef.current = null;
+        setInlineEditingWordId(null);
+    }
+
+    function revertInlineWordText(wordId: number, text: string) {
+        setLayoutLines(function (lines) {
+            if (!lines) return lines;
+            return revertLayoutWordText(lines, wordId, text);
+        });
+        setDraft(function (current) {
+            if (current !== null && current.id === wordId) {
+                return { ...current, text };
+            }
+            return current;
+        });
+    }
+
+    function updateDraftText(text: string) {
+        setDraft(function (current) {
+            if (!current) return current;
+            const inlineId = inlineEditingWordIdRef.current;
+            if (inlineId !== null && current.id !== inlineId) {
+                return current;
+            }
+            const next = { ...current, text };
+            setLayoutLines(function (lines) {
+                if (!lines) return lines;
+                return lines.map(function (line) {
+                    return line.map(function (word) {
+                        return word.id === current.id ? { ...word, text } : word;
+                    });
+                });
+            });
+            return next;
+        });
+    }
+
+    function enterInlineEdit(wordId: number, clickClientX: number, clickClientY: number) {
+        abortFrameDragRef.current?.();
+        pendingCaretRef.current = { x: clickClientX, y: clickClientY };
+        setInlineEditingWordId(wordId);
+        setPendingWordGesture(null);
+    }
+
+    function cancelInlineEdit() {
+        const currentDraft = draftRef.current;
+        if (currentDraft === null || inlineEditingWordIdRef.current === null) {
+            return;
+        }
+        updateDraftText(lastSavedTextForWord(currentDraft.id, wordsRef.current));
+        clearInlineEditing();
+    }
+
+    function commitInlineEdit() {
+        if (isCommittingInlineRef.current) {
+            return;
+        }
+        const inlineWordId = inlineEditingWordIdRef.current;
+        if (inlineWordId === null) {
+            return;
+        }
+
+        const currentDraft = draftRef.current;
+        let toSave: Word | null = null;
+        if (currentDraft !== null && currentDraft.id === inlineWordId) {
+            toSave = currentDraft;
+        } else {
+            const fromLayout = findWordInLayout(layoutLinesRef.current, inlineWordId);
+            if (fromLayout) {
+                toSave = fromLayout;
+            }
+        }
+        if (toSave === null) {
+            clearInlineEditing();
+            return;
+        }
+
+        const baseline = lastSavedTextForWord(inlineWordId, wordsRef.current);
+        clearInlineEditing();
+
+        if (toSave.text.trim() === '') {
+            if (isUnsavedWordId(inlineWordId)) {
+                setLayoutLines(function (lines) { return removeWordFromLayout(lines, inlineWordId); });
+            } else {
+                revertInlineWordText(inlineWordId, baseline);
+            }
+            return;
+        }
+
+        if (toSave.text === baseline) {
+            return;
+        }
+
+        isCommittingInlineRef.current = true;
+        const committingWordId = inlineWordId;
+        persistWordContent(toSave).catch(function () {
+            if (draftRef.current?.id === committingWordId) {
+                inlineEditingWordIdRef.current = committingWordId;
+                setInlineEditingWordId(committingWordId);
+            }
+        }).finally(function () {
+            isCommittingInlineRef.current = false;
+        });
+    }
+
+    function persistWordContent(toSave: Word): Promise<Word> {
+        if (scanId === null) {
+            return Promise.reject(new Error('Скан не выбран'));
+        }
+
+        setIsSaving(true);
+        setSaveStatus("Сохранение");
+
+        const isNew = isUnsavedWordId(toSave.id);
+        const url = isNew
+            ? "/api/Scans/" + scanId + "/words"
+            : "/api/Scans/" + scanId + "/words/" + toSave.id;
+
+        return fetch(url, {
+            method: isNew ? "POST" : "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(wordContentBody(toSave)),
+        }).then(function (response) {
+            if (!response.ok) {
+                return readError(response);
+            }
+            return response.json() as Promise<Word>;
+        }).then(function (saved) {
+            if (isNew && layoutLines) {
+                setLayoutLines(replaceWordIdInLayout(layoutLines, toSave.id, saved.id));
+            } else if (layoutLines) {
+                setLayoutLines(applySavedWordToLayout(layoutLines, saved));
+            }
+            return fetchWords(scanId).then(function (list) {
+                setWords(list);
+                setDraft(function (current) {
+                    if (current !== null && current.id !== saved.id) {
+                        return current;
+                    }
+                    return saved;
+                });
+                setSaveStatus("Сохранено");
+                return saved;
+            });
+        }).catch(function (error) {
+            setSaveStatus("Ошибка сохранения: " + error.message);
+            throw error;
+        }).finally(function () {
+            setIsSaving(false);
+        });
+    }
+
+    useEffect(function () {
+        if (!pendingWordGesture) {
+            return;
+        }
+
+        function onMouseMove(event: MouseEvent) {
+            setPendingWordGesture(function (current) {
+                if (!current || current.exceededThreshold) {
+                    return current;
+                }
+                if (distanceExceeded(current, event.clientX, event.clientY)) {
+                    return { ...current, exceededThreshold: true };
+                }
+                return current;
+            });
+        }
+
+        function onMouseUp() {
+            const gesture = pendingWordGesture;
+            setPendingWordGesture(null);
+            const willEnter = gesture !== null &&
+                !gesture.exceededThreshold &&
+                draftRef.current?.id === gesture.wordId &&
+                inlineEditingWordIdRef.current === null;
+            if (willEnter && gesture) {
+                enterInlineEdit(gesture.wordId, gesture.clickClientX, gesture.clickClientY);
+            }
+        }
+
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+        return function () {
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+        };
+    }, [pendingWordGesture]);
+
+    useEffect(function () {
+        if (inlineEditingWordId === null) {
+            return;
+        }
+        const input = inlineInputRef.current;
+        if (!input) {
+            return;
+        }
+        input.focus();
+        const caret = pendingCaretRef.current;
+        if (caret) {
+            const index = caretIndexFromClick(input, caret.x, caret.y);
+            input.setSelectionRange(index, index);
+            pendingCaretRef.current = null;
+        }
+    }, [inlineEditingWordId]);
+
     function handleWordSelect(word: Word) {
-        // Повторный клик по уже выбранному слову не должен отбрасывать начатые правки
-        if (draft && draft.id === word.id) return;
+        if (draft && draft.id === word.id) {
+            return;
+        }
+        if (inlineEditingWordId !== null) {
+            commitInlineEdit();
+        }
         abortFrameDragRef.current?.();
         selectWord(word);
+    }
+
+    function handleWordMouseDown(event: React.MouseEvent, word: Word) {
+        if (draft?.id !== word.id || inlineEditingWordId !== null) {
+            return;
+        }
+        setPendingWordGesture({
+            wordId: word.id,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            clickClientX: event.clientX,
+            clickClientY: event.clientY,
+            exceededThreshold: false,
+        });
     }
 
     function DraftCoordinateFields({ draftWord }: { draftWord: Word }) {
@@ -708,12 +979,17 @@ function App() {
     function handleAddClick() {
         if (scanId === null) return;
 
+        if (inlineEditingWordId !== null) {
+            commitInlineEdit();
+        }
+
         const baseLayout = layoutLines ?? (words ? buildLayoutFromWords(words) : []);
-        // Новое слово встаёт сразу после выбранного, иначе в конец последней строки
-        const afterWordId = draft && draft.id !== 0 ? draft.id : null;
+        const afterWordId = draft ? draft.id : null;
+        const tempId = nextTempWordIdRef.current;
+        nextTempWordIdRef.current -= 1;
         const newWord: Word = {
-            // Ноль означает, что записи в БД ещё нет: настоящий id выдаёт сама БД
-            id: 0,
+            // Отрицательный id — локальный черновик до POST; каждое новое слово уникально
+            id: tempId,
             // Скан сервер берёт из адреса запроса, значение из тела он игнорирует
             scanId,
             text: "",
@@ -728,23 +1004,12 @@ function App() {
     }
 
     function handleTextChange(event: React.ChangeEvent<HTMLInputElement>) {
-        const text = event.target.value;
-        setDraft(function (current) {
-            if (!current) return current;
-            const next = { ...current, text };
-            setLayoutLines(function (lines) {
-                if (!lines) return lines;
-                return lines.map(function (line) {
-                    return line.map(function (word) {
-                        return word.id === current.id ? { ...word, text } : word;
-                    });
-                });
-            });
-            return next;
-        });
+        updateDraftText(event.target.value);
     }
 
     function handleCancelClick() {
+        setInlineEditingWordId(null);
+        setPendingWordGesture(null);
         abortFrameDragRef.current?.();
         setDraft(null);
         setSaveStatus(null);
@@ -758,6 +1023,10 @@ function App() {
     }
 
     function handleDragStart(event: React.DragEvent, word: Word) {
+        if (inlineEditingWordId === word.id) {
+            event.preventDefault();
+            return;
+        }
         event.dataTransfer.setData("text/plain", String(word.id));
         event.dataTransfer.effectAllowed = "move";
         setDraggedWordId(word.id);
@@ -849,46 +1118,11 @@ function App() {
         setGapDropTarget(null);
     }
 
-    // Сохраняется только текст и координаты; порядок слов — отдельной кнопкой
     function handleSaveClick() {
         const toSave = commitPreviewRef.current?.() ?? draft;
-        if (scanId === null || toSave === null) return;
-
-        setIsSaving(true);
-        setSaveStatus("Сохранение");
-
-        const isNew = toSave.id === 0;
-        // У слова без id записи в БД ещё нет, поэтому его создают, а не обновляют
-        const url = isNew
-            ? "/api/Scans/" + scanId + "/words"
-            : "/api/Scans/" + scanId + "/words/" + toSave.id;
-
-        fetch(url, {
-            method: isNew ? "POST" : "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(wordContentBody(toSave)),
-        }).then(function (response) {
-            if (!response.ok) {
-                // Об ошибках сервер сообщает текстом, а не JSON
-                return readError(response);
-            }
-            return response.json() as Promise<Word>;
-        }).then(function (saved) {
-            if (isNew && layoutLines) {
-                // БД выдала id; в локальной раскладке временный id=0 заменяется на настоящий
-                setLayoutLines(replaceWordIdInLayout(layoutLines, 0, saved.id));
-            } else if (layoutLines) {
-                setLayoutLines(applySavedWordToLayout(layoutLines, saved));
-            }
-            return fetchWords(scanId).then(function (list) {
-                setWords(list);
-                setDraft(saved);
-                setSaveStatus("Сохранено");
-            });
-        }).catch(function (error) {
-            setSaveStatus("Ошибка сохранения: " + error.message);
-        }).finally(function () {
-            setIsSaving(false);
+        if (toSave === null) return;
+        persistWordContent(toSave).catch(function () {
+            // saveStatus уже установлен в persistWordContent
         });
     }
 
@@ -900,7 +1134,7 @@ function App() {
         if (!layoutToSave) return;
 
         if (layoutToSave.some(function (line) {
-            return line.some(function (word) { return word.id === 0; });
+            return line.some(function (word) { return isUnsavedWordId(word.id); });
         })) {
             setLayoutSaveStatus("Сначала сохраните новое слово");
             return;
@@ -1018,6 +1252,7 @@ function App() {
                                             {lineWords.map(function (word, positionInLine) {
                                                 const isSelected = draft !== null && draft.id === word.id;
                                                 const shown = isSelected ? draft : word;
+                                                const isInline = inlineEditingWordId === word.id;
                                                 const isDragging = draggedWordId === word.id;
                                                 const isDropTarget = dropTarget !== null &&
                                                     dropTarget.lineIndex === lineIndex &&
@@ -1029,28 +1264,54 @@ function App() {
                                                 return (
                                                     <span key={word.id}>
                                                         {positionInLine > 0 ? " " : null}
-                                                        <span
-                                                            className={
-                                                                "word" +
-                                                                vectorizationClass +
-                                                                (isSelected ? " selected" : "") +
-                                                                (isDragging ? " dragging" : "") +
-                                                                (isDropTarget ? " drop-target" : "")
-                                                            }
-                                                            draggable={true}
-                                                            onDragStart={function (event) { handleDragStart(event, word); }}
-                                                            onDragEnd={handleDragEnd}
-                                                            onDragOver={function (event) {
-                                                                handleDragOverWord(event, lineIndex, positionInLine);
-                                                            }}
-                                                            onDrop={function (event) {
-                                                                event.stopPropagation();
-                                                                handleDrop(event, lineIndex, positionInLine);
-                                                            }}
-                                                            onClick={function () { handleWordSelect(word); }}
-                                                        >
-                                                            {shown.text || (word.id === 0 ? "…" : "")}
-                                                        </span>
+                                                        {isInline ? (
+                                                            <InlineWordInput
+                                                                value={shown.text}
+                                                                onChange={updateDraftText}
+                                                                onKeyDown={function (event) {
+                                                                    if (event.key === "Enter") {
+                                                                        event.preventDefault();
+                                                                        commitInlineEdit();
+                                                                    } else if (event.key === "Escape") {
+                                                                        event.preventDefault();
+                                                                        cancelInlineEdit();
+                                                                    }
+                                                                }}
+                                                                onBlur={commitInlineEdit}
+                                                                inputRef={inlineInputRef}
+                                                                placeholder={isUnsavedWordId(word.id) ? "…" : undefined}
+                                                            />
+                                                        ) : (
+                                                            <span
+                                                                className={
+                                                                    "word" +
+                                                                    vectorizationClass +
+                                                                    (isSelected ? " selected" : "") +
+                                                                    (isDragging ? " dragging" : "") +
+                                                                    (isDropTarget ? " drop-target" : "")
+                                                                }
+                                                                draggable={!isInline}
+                                                                onMouseDown={function (event) {
+                                                                    handleWordMouseDown(event, word);
+                                                                }}
+                                                                onDragStart={function (event) {
+                                                                    handleDragStart(event, word);
+                                                                }}
+                                                                onDragEnd={handleDragEnd}
+                                                                onDragOver={function (event) {
+                                                                    handleDragOverWord(event, lineIndex, positionInLine);
+                                                                }}
+                                                                onDrop={function (event) {
+                                                                    event.stopPropagation();
+                                                                    handleDrop(event, lineIndex, positionInLine);
+                                                                }}
+                                                                onClick={function () {
+                                                                    handleWordSelect(word);
+                                                                }}
+                                                            >
+                                                                {shown.text || (isUnsavedWordId(word.id) ? "…" : "")}
+                                                            </span>
+                                                        )}
                                                     </span>
                                                 );
                                             })}
@@ -1083,7 +1344,7 @@ function App() {
                 {draft ? (
                     <div className="editor">
                         <p>
-                            {draft.id === 0
+                            {isUnsavedWordId(draft.id)
                                 ? "Новое слово на позицию " + draft.orderIndex
                                 : "Слово на позиции " + draft.orderIndex}
                         </p>

@@ -128,6 +128,19 @@
     outline: 1px solid #1b7ff5;
 }
 
+.word-inline-input {
+    font: inherit;
+    border: none;
+    outline: 1px solid #1b7ff5;
+    background: var(--accent-bg);
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    cursor: text;
+    border-radius: 2px;
+    box-sizing: content-box;
+}
+
 .word.dragging {
     opacity: 0.5;
 }

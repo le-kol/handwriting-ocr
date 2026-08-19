@@ -51,7 +51,7 @@ export default function ScanFrameOverlay<T extends WordLike & FrameCoords>({
                     />
                 );
             })}
-            {draft && draft.id === 0 && displayDraft ? (
+            {draft && draft.id <= 0 && displayDraft ? (
                 <polygon
                     className={"selected" + (isFrameDragging ? " frame-dragging" : "")}
                     points={boxPoints(displayDraft)}

@@ -24,7 +24,7 @@
 
 **Purpose**: Подтвердить brownfield draft/save и recognized-text перед inline-редактированием
 
-- [ ] T001 Confirm existing inline-edit prerequisites in `handwritingocr.client/src/App.tsx`: `Word`, `draft`, `words`, `layoutLines`, `handleWordSelect`, `handleTextChange`, `handleSaveClick`, `handleCancelClick`, `wordContentBody`, `.recognized-text` word spans with `draggable={true}` and `onClick` per `specs/009-inline-word-text-edit/plan.md`
+- [X] T001 Confirm existing inline-edit prerequisites in `handwritingocr.client/src/App.tsx`: `Word`, `draft`, `words`, `layoutLines`, `handleWordSelect`, `handleTextChange`, `handleSaveClick`, `handleCancelClick`, `wordContentBody`, `.recognized-text` word spans with `draggable={true}` and `onClick` per `specs/009-inline-word-text-edit/plan.md`
 
 ---
 
@@ -34,11 +34,11 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 [P] Create `handwritingocr.client/src/inlineWordEdit.ts` with pure helpers: `DRAG_CLICK_THRESHOLD_PX` (5), `lastSavedTextForWord(id, words)`, `distanceExceeded(gesture, x, y)`, `caretIndexFromClick(input, clientX, clientY)` per `specs/009-inline-word-text-edit/research.md`
-- [ ] T003 Add `inlineEditingWordId: number | null` and `pendingWordGesture` state (types from `specs/009-inline-word-text-edit/data-model.md`) in `handwritingocr.client/src/App.tsx`; reset both in `resetEditorState` and `handleCancelClick`
-- [ ] T004 Extract `updateDraftText(text: string)` from `handleTextChange` in `handwritingocr.client/src/App.tsx` — updates `draft` and `layoutLines` text for matching word id (FR-007)
-- [ ] T005 Extract `persistWordContent(draft: Word): Promise<Word>` from `handleSaveClick` in `handwritingocr.client/src/App.tsx` — POST/PUT, `replaceWordIdInLayout` for id=0, `fetchWords`, `setWords`, `setDraft(saved)`; shared by panel Save and inline autosave
-- [ ] T006 [P] Add `.word-inline-input` styles in `handwritingocr.client/src/App.css` per `specs/009-inline-word-text-edit/contracts/inline-word-text-ui.md` (inherit font, selected outline, minimal padding)
+- [X] T002 [P] Create `handwritingocr.client/src/inlineWordEdit.ts` with pure helpers: `DRAG_CLICK_THRESHOLD_PX` (5), `lastSavedTextForWord(id, words)`, `distanceExceeded(gesture, x, y)`, `caretIndexFromClick(input, clientX, clientY)` per `specs/009-inline-word-text-edit/research.md`
+- [X] T003 Add `inlineEditingWordId: number | null` and `pendingWordGesture` state (types from `specs/009-inline-word-text-edit/data-model.md`) in `handwritingocr.client/src/App.tsx`; reset both in `resetEditorState` and `handleCancelClick`
+- [X] T004 Extract `updateDraftText(text: string)` from `handleTextChange` in `handwritingocr.client/src/App.tsx` — updates `draft` and `layoutLines` text for matching word id (FR-007)
+- [X] T005 Extract `persistWordContent(draft: Word): Promise<Word>` from `handleSaveClick` in `handwritingocr.client/src/App.tsx` — POST/PUT, `replaceWordIdInLayout` for id=0, `fetchWords`, `setWords`, `setDraft(saved)`; shared by panel Save and inline autosave
+- [X] T006 [P] Add `.word-inline-input` styles in `handwritingocr.client/src/App.css` per `specs/009-inline-word-text-edit/contracts/inline-word-text-ui.md` (inherit font, selected outline, minimal padding)
 
 **Checkpoint**: Helpers, state, shared save, CSS — можно подключать inline UX
 
@@ -52,14 +52,14 @@
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Implement window-attached gesture handlers on selected `.word` in `handwritingocr.client/src/App.tsx`: `onMouseDown` → `pendingWordGesture`; `mousemove`/`mouseup` → threshold check; mouseup without threshold → `enterInlineEdit(wordId, clickClientX/Y)` (FR-002, FR-017)
-- [ ] T008 [US1] Remove or replace `handleWordSelect` early-return for same word in `handwritingocr.client/src/App.tsx` — first click on unselected word still selects; inline entry only via gesture mouseup on already-selected word
-- [ ] T009 [P] [US1] Create `handwritingocr.client/src/InlineWordInput.tsx` (controlled input: `value`, `onChange`, `onKeyDown`, `onBlur`, `autoFocus`, `className="word word-inline-input selected"`) OR equivalent inline block in `App.tsx`
-- [ ] T010 [US1] In recognized-text render in `handwritingocr.client/src/App.tsx`, when `inlineEditingWordId === word.id` render `InlineWordInput` instead of text span; set `draggable={false}` for that word (FR-010)
-- [ ] T011 [US1] Implement `enterInlineEdit` in `handwritingocr.client/src/App.tsx`: set `inlineEditingWordId`, focus input, set caret via `caretIndexFromClick` (FR-003)
-- [ ] T012 [US1] Implement `commitInlineEdit` in `handwritingocr.client/src/App.tsx`: if `draft.text === lastSavedTextForWord` → clear inline only (FR-005); else call `persistWordContent` → on success clear inline + `saveStatus` «Сохранено»; on error stay inline + RU error (FR-004, FR-014, FR-015)
-- [ ] T013 [US1] Wire Enter (`preventDefault`) and `onBlur` on inline input to `commitInlineEdit` in `handwritingocr.client/src/App.tsx`
-- [ ] T014 [US1] Implement `cancelInlineEdit` on Escape in `handwritingocr.client/src/App.tsx`: revert `draft.text` and `layoutLines` text to `lastSavedTextForWord`; clear `inlineEditingWordId`; keep panel open (FR-006)
+- [X] T007 [US1] Implement window-attached gesture handlers on selected `.word` in `handwritingocr.client/src/App.tsx`: `onMouseDown` → `pendingWordGesture`; `mousemove`/`mouseup` → threshold check; mouseup without threshold → `enterInlineEdit(wordId, clickClientX/Y)` (FR-002, FR-017)
+- [X] T008 [US1] Remove or replace `handleWordSelect` early-return for same word in `handwritingocr.client/src/App.tsx` — first click on unselected word still selects; inline entry only via gesture mouseup on already-selected word
+- [X] T009 [P] [US1] Create `handwritingocr.client/src/InlineWordInput.tsx` (controlled input: `value`, `onChange`, `onKeyDown`, `onBlur`, `autoFocus`, `className="word word-inline-input selected"`) OR equivalent inline block in `App.tsx`
+- [X] T010 [US1] In recognized-text render in `handwritingocr.client/src/App.tsx`, when `inlineEditingWordId === word.id` render `InlineWordInput` instead of text span; set `draggable={false}` for that word (FR-010)
+- [X] T011 [US1] Implement `enterInlineEdit` in `handwritingocr.client/src/App.tsx`: set `inlineEditingWordId`, focus input, set caret via `caretIndexFromClick` (FR-003)
+- [X] T012 [US1] Implement `commitInlineEdit` in `handwritingocr.client/src/App.tsx`: if `draft.text === lastSavedTextForWord` → clear inline only (FR-005); else call `persistWordContent` → on success clear inline + `saveStatus` «Сохранено»; on error stay inline + RU error (FR-004, FR-014, FR-015)
+- [X] T013 [US1] Wire Enter (`preventDefault`) and `onBlur` on inline input to `commitInlineEdit` in `handwritingocr.client/src/App.tsx`
+- [X] T014 [US1] Implement `cancelInlineEdit` on Escape in `handwritingocr.client/src/App.tsx`: revert `draft.text` and `layoutLines` text to `lastSavedTextForWord`; clear `inlineEditingWordId`; keep panel open (FR-006)
 
 **Checkpoint**: MVP — inline edit + autosave + Escape + error retry без регрессий панели
 
@@ -73,10 +73,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Wire inline input `onChange` to `updateDraftText` in `handwritingocr.client/src/App.tsx` so panel field «Текст» reflects draft in real time during inline edit (FR-007)
-- [ ] T016 [US2] Refactor `handleSaveClick` in `handwritingocr.client/src/App.tsx` to delegate to `persistWordContent`; keep explicit button-only save for panel edits — no autosave on `handleTextChange` alone (FR-008)
-- [ ] T017 [US2] Verify `persistWordContent` / inline commit sends `wordContentBody(draft)` including x1–y4 from current draft in `handwritingocr.client/src/App.tsx` (FR-009, User Story 2 #4)
-- [ ] T018 [US2] Use shared `saveStatus` / `isSaving` for inline autosave in `handwritingocr.client/src/App.tsx` — «Сохранение», «Сохранено», «Ошибка сохранения: …» (FR-014)
+- [X] T015 [US2] Wire inline input `onChange` to `updateDraftText` in `handwritingocr.client/src/App.tsx` so panel field «Текст» reflects draft in real time during inline edit (FR-007)
+- [X] T016 [US2] Refactor `handleSaveClick` in `handwritingocr.client/src/App.tsx` to delegate to `persistWordContent`; keep explicit button-only save for panel edits — no autosave on `handleTextChange` alone (FR-008)
+- [X] T017 [US2] Verify `persistWordContent` / inline commit sends `wordContentBody(draft)` including x1–y4 from current draft in `handwritingocr.client/src/App.tsx` (FR-009, User Story 2 #4)
+- [X] T018 [US2] Use shared `saveStatus` / `isSaving` for inline autosave in `handwritingocr.client/src/App.tsx` — «Сохранение», «Сохранено», «Ошибка сохранения: …» (FR-014)
 
 **Checkpoint**: Panel и inline используют один draft и один save pipeline
 
@@ -90,11 +90,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] Verify gesture threshold in `handwritingocr.client/src/App.tsx`: movement > 5px allows HTML5 `handleDragStart` on selected word without entering inline; short click enters inline (FR-011, FR-017)
-- [ ] T020 [US3] Verify frame selection via `ScanFrameOverlay` then single text click opens inline without extra select click in `handwritingocr.client/src/App.tsx` (clarification Q4, acceptance 2a)
-- [ ] T021 [US3] Update `handleCancelClick` in `handwritingocr.client/src/App.tsx`: `setInlineEditingWordId(null)` then full draft reset (text + coords to server) — same as pre-inline «Отмена» (FR-016)
-- [ ] T022 [US3] Implement blur-then-select ordering in `handwritingocr.client/src/App.tsx`: inline `onBlur` commits current word before `handleWordSelect` on another `.word` (edge case switch word)
-- [ ] T023 [US3] Regression pass in `handwritingocr.client/src/App.tsx`: HTML5 text DnD (`handleDragStart`, gap/word/line drop) unchanged; `ScanFrameOverlay` frame drag unchanged; «Сохранить порядок» unchanged; add word / recognize / batch vectorize / delete unchanged (FR-011, FR-012)
+- [X] T019 [US3] Verify gesture threshold in `handwritingocr.client/src/App.tsx`: movement > 5px allows HTML5 `handleDragStart` on selected word without entering inline; short click enters inline (FR-011, FR-017)
+- [X] T020 [US3] Verify frame selection via `ScanFrameOverlay` then single text click opens inline without extra select click in `handwritingocr.client/src/App.tsx` (clarification Q4, acceptance 2a)
+- [X] T021 [US3] Update `handleCancelClick` in `handwritingocr.client/src/App.tsx`: `setInlineEditingWordId(null)` then full draft reset (text + coords to server) — same as pre-inline «Отмена» (FR-016)
+- [X] T022 [US3] Implement blur-then-select ordering in `handwritingocr.client/src/App.tsx`: inline `onBlur` commits current word before `handleWordSelect` on another `.word` (edge case switch word)
+- [X] T023 [US3] Regression pass in `handwritingocr.client/src/App.tsx`: HTML5 text DnD (`handleDragStart`, gap/word/line drop) unchanged; `ScanFrameOverlay` frame drag unchanged; «Сохранить порядок» unchanged; add word / recognize / batch vectorize / delete unchanged (FR-011, FR-012)
 
 **Checkpoint**: Все регрессионные сценарии из FR-011/FR-012 проходят
 
@@ -104,8 +104,8 @@
 
 **Purpose**: Edge cases и приёмка по quickstart
 
-- [ ] T024 [P] Handle edge cases in `handwritingocr.client/src/App.tsx`: double-click unselected word (select then inline); empty text save for id=0; guard double `commitInlineEdit` with ref during blur+click; block drag on word while `inlineEditingWordId !== null`
-- [ ] T025 Run manual validation scenarios from `specs/009-inline-word-text-edit/quickstart.md` §§1–12 against running SPA+API
+- [X] T024 [P] Handle edge cases in `handwritingocr.client/src/App.tsx`: double-click unselected word (select then inline); empty text save for id=0; guard double `commitInlineEdit` with ref during blur+click; block drag on word while `inlineEditingWordId !== null`
+- [X] T025 Run manual validation scenarios from `specs/009-inline-word-text-edit/quickstart.md` §§1–12 against running SPA+API
 
 ---
 
