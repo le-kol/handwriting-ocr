@@ -11,6 +11,7 @@ import {
     wordFrameContentBody,
 } from './wordFrame';
 import ScanFrameOverlay from './ScanFrameOverlay';
+import ScanVectorsPanel from './ScanVectorsPanel';
 import InlineWordInput from './InlineWordInput';
 import {
     caretIndexFromClick,
@@ -1218,6 +1219,7 @@ function App() {
                         <ScanFrameOverlay words={words} draft={draft} imageSize={imageSize} />
                     </div>
                     <div className="workspace-side">
+                        <div className="workspace-side-main">
                         {displayLines && displayLines.length > 0 ? (
                             <div className="recognized-text-block">
                                 <div className="layout-toolbar">
@@ -1323,6 +1325,14 @@ function App() {
                                 </div>
                             </div>
                         ) : null}
+                        {displayLines !== null ? (
+                            <ScanVectorsPanel
+                                lines={displayLines}
+                                selectedWordId={draft?.id ?? null}
+                                onSelectWord={handleWordSelect}
+                            />
+                        ) : null}
+                        </div>
 
                         <button type="button" onClick={handleRecognizeClick} disabled={isRecognizing || isDeleteDisabled}>
                             {isRecognizing ? "Распознавание..." : "Распознать текст"}

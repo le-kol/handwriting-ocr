@@ -24,7 +24,7 @@
 
 **Purpose**: Подтвердить brownfield-зависимости перед добавлением панели векторов
 
-- [ ] T001 Confirm prerequisites in `handwritingocr.client/src/`: `WordCurveThumbnail.tsx`, `curvePoints.ts` (`isWordVectorized`), `displayLines` / `effectiveLayout`, `handleWordSelect` / `selectWord`, `draft` state in `App.tsx` per `specs/010-scan-vectors-panel/plan.md` and `contracts/scan-vectors-panel-ui.md`
+- [x] T001 Confirm prerequisites in `handwritingocr.client/src/`: `WordCurveThumbnail.tsx`, `curvePoints.ts` (`isWordVectorized`), `displayLines` / `effectiveLayout`, `handleWordSelect` / `selectWord`, `draft` state in `App.tsx` per `specs/010-scan-vectors-panel/plan.md` and `contracts/scan-vectors-panel-ui.md`
 
 ---
 
@@ -34,10 +34,10 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 Create `ScanVectorsPanel.tsx` in `handwritingocr.client/src/` with props type `{ lines: Word[][]; selectedWordId: number | null; onSelectWord: (word: Word) => void }` and empty `<section className="scan-vectors-panel">` shell
-- [ ] T003 Add `.workspace-side-main` flex wrapper in `handwritingocr.client/src/App.tsx` around `recognized-text-block` (sibling slot prepared for `ScanVectorsPanel` below text block)
-- [ ] T004 Import and render `ScanVectorsPanel` in `handwritingocr.client/src/App.tsx` inside `.workspace-side-main` when `displayLines` is available; pass `lines={displayLines}`, `selectedWordId={draft?.id ?? null}`, `onSelectWord={handleWordSelect}` (or existing select handler)
-- [ ] T005 [P] Add base CSS for `.scan-vectors-panel`, `.vector-line`, `.vector-slot` in `handwritingocr.client/src/App.css`
+- [x] T002 Create `ScanVectorsPanel.tsx` in `handwritingocr.client/src/` with props type `{ lines: Word[][]; selectedWordId: number | null; onSelectWord: (word: Word) => void }` and empty `<section className="scan-vectors-panel">` shell
+- [x] T003 Add `.workspace-side-main` flex wrapper in `handwritingocr.client/src/App.tsx` around `recognized-text-block` (sibling slot prepared for `ScanVectorsPanel` below text block)
+- [x] T004 Import and render `ScanVectorsPanel` in `handwritingocr.client/src/App.tsx` inside `.workspace-side-main` when `displayLines` is available; pass `lines={displayLines}`, `selectedWordId={draft?.id ?? null}`, `onSelectWord={handleWordSelect}` (or existing select handler)
+- [x] T005 [P] Add base CSS for `.scan-vectors-panel`, `.vector-line`, `.vector-slot` in `handwritingocr.client/src/App.css`
 
 **Checkpoint**: Пустая секция панели векторов видна под текстом; props подключены
 
@@ -51,10 +51,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Map `lines` prop to `.vector-line` rows with one `.vector-slot` per word index in `handwritingocr.client/src/ScanVectorsPanel.tsx` (no `line-gap-drop`)
-- [ ] T007 [US1] Render `WordCurveThumbnail` with `className="word-curve-thumb"` inside slots where `isWordVectorized(word)` in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T008 [US1] Add section heading (RU, e.g. «Векторы слов») to `.scan-vectors-panel` in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T009 [US1] Ensure `App.tsx` passes current `displayLines` (not stale `words`-only order) as `lines` to `ScanVectorsPanel` in `handwritingocr.client/src/App.tsx`
+- [x] T006 [US1] Map `lines` prop to `.vector-line` rows with one `.vector-slot` per word index in `handwritingocr.client/src/ScanVectorsPanel.tsx` (no `line-gap-drop`)
+- [x] T007 [US1] Render `WordCurveThumbnail` with `className="word-curve-thumb"` inside slots where `isWordVectorized(word)` in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T008 [US1] Add section heading (RU, e.g. «Векторы слов») to `.scan-vectors-panel` in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T009 [US1] Ensure `App.tsx` passes current `displayLines` (not stale `words`-only order) as `lines` to `ScanVectorsPanel` in `handwritingocr.client/src/App.tsx`
 
 **Checkpoint**: MVP — одновременный обзор миниатюр векторизованных слов в порядке раскладки
 
@@ -68,8 +68,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T010 [US2] Reuse existing `.word-curve-thumb` sizing (9rem × 4.5rem from `App.css`) for slot thumbnails in `handwritingocr.client/src/ScanVectorsPanel.tsx`; do not add scan-coordinate SVG overlay
-- [ ] T011 [US2] Verify `ScanFrameOverlay` and `.scan img` remain free of vector curve paths (no changes to overlay components unless regression found) per `contracts/scan-vectors-panel-ui.md`
+- [x] T010 [US2] Reuse existing `.word-curve-thumb` sizing (9rem × 4.5rem from `App.css`) for slot thumbnails in `handwritingocr.client/src/ScanVectorsPanel.tsx`; do not add scan-coordinate SVG overlay
+- [x] T011 [US2] Verify `ScanFrameOverlay` and `.scan img` remain free of vector curve paths (no changes to overlay components unless regression found) per `contracts/scan-vectors-panel-ui.md`
 
 **Checkpoint**: Миниатюры только в панели векторов и editor; не на скане
 
@@ -83,10 +83,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] Add `onClick` on each `.vector-slot` calling `onSelectWord(word)` with `type="button"` or role=button semantics in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T013 [US3] Apply `.vector-slot.selected` when `word.id === selectedWordId` in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T014 [P] [US3] Add `.vector-slot.selected` styles mirroring `.word.selected` (accent background + outline) in `handwritingocr.client/src/App.css`
-- [ ] T015 [US3] Confirm `onSelectWord` from `App.tsx` is the same handler used by text `.word` click and frame select (single selection path) in `handwritingocr.client/src/App.tsx`
+- [x] T012 [US3] Add `onClick` on each `.vector-slot` calling `onSelectWord(word)` with `type="button"` or role=button semantics in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T013 [US3] Apply `.vector-slot.selected` when `word.id === selectedWordId` in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T014 [P] [US3] Add `.vector-slot.selected` styles mirroring `.word.selected` (accent background + outline) in `handwritingocr.client/src/App.css`
+- [x] T015 [US3] Confirm `onSelectWord` from `App.tsx` is the same handler used by text `.word` click and frame select (single selection path) in `handwritingocr.client/src/App.tsx`
 
 **Checkpoint**: Панель векторов — полноценный канал навигации и выбора слова
 
@@ -100,10 +100,10 @@
 
 ### Implementation for User Story 4
 
-- [ ] T016 [P] [US4] Add flex column layout to `.workspace-side` and `.workspace-side-main` with `min-height: 0` in `handwritingocr.client/src/App.css`
-- [ ] T017 [P] [US4] Set `flex: 1 1 0`, `min-height: 12rem`, `overflow: auto` on `.recognized-text-block` and `.scan-vectors-panel` inside `.workspace-side-main` in `handwritingocr.client/src/App.css`
-- [ ] T018 [US4] Add desktop height context on `.workspace` (e.g. `min-height` / `height: calc(100vh - …)` or equivalent) so both right sections share viewport without whole-page scroll in `handwritingocr.client/src/App.css`
-- [ ] T019 [US4] Add `@media (max-width: 900px) { .workspace { flex-direction: column; } }` for mobile stack order scan → text → vectors in `handwritingocr.client/src/App.css`
+- [x] T016 [P] [US4] Add flex column layout to `.workspace-side` and `.workspace-side-main` with `min-height: 0` in `handwritingocr.client/src/App.css`
+- [x] T017 [P] [US4] Set `flex: 1 1 0`, `min-height: 12rem`, `overflow: auto` on `.recognized-text-block` and `.scan-vectors-panel` inside `.workspace-side-main` in `handwritingocr.client/src/App.css`
+- [x] T018 [US4] Add desktop height context on `.workspace` (e.g. `min-height` / `height: calc(100vh - …)` or equivalent) so both right sections share viewport without whole-page scroll in `handwritingocr.client/src/App.css`
+- [x] T019 [US4] Add `@media (max-width: 900px) { .workspace { flex-direction: column; } }` for mobile stack order scan → text → vectors in `handwritingocr.client/src/App.css`
 
 **Checkpoint**: Компоновка соответствует FR-008, FR-010 и контракту layout
 
@@ -117,11 +117,11 @@
 
 ### Implementation for User Story 5
 
-- [ ] T020 [US5] Render `.vector-slot.empty` (dashed neutral marker, no SVG path) for `!isWordVectorized(word)` slots in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T021 [US5] When no words are vectorized, still render full line/slot mirror with all `.vector-slot.empty` (panel visible, not hidden) in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T022 [US5] If `isWordVectorized(word)` but `WordCurveThumbnail` returns null (invalid curves), show neutral/empty slot without throwing in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T023 [US5] When `lines.length === 0`, show minimal empty state inside `.scan-vectors-panel` (no slot rows) in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T024 [US5] Do **not** add separate panel state in `App.tsx`; confirm panel updates via existing `words` / `layoutLines` / `displayLines` after vectorize, batch, delete, and DnD handlers
+- [x] T020 [US5] Render `.vector-slot.empty` (dashed neutral marker, no SVG path) for `!isWordVectorized(word)` slots in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T021 [US5] When no words are vectorized, still render full line/slot mirror with all `.vector-slot.empty` (panel visible, not hidden) in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T022 [US5] If `isWordVectorized(word)` but `WordCurveThumbnail` returns null (invalid curves), show neutral/empty slot without throwing in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T023 [US5] When `lines.length === 0`, show minimal empty state inside `.scan-vectors-panel` (no slot rows) in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T024 [US5] Do **not** add separate panel state in `App.tsx`; confirm panel updates via existing `words` / `layoutLines` / `displayLines` after vectorize, batch, delete, and DnD handlers
 
 **Checkpoint**: Пустые и частично заполненные состояния корректны; данные актуальны без перезагрузки
 
@@ -135,9 +135,9 @@
 
 ### Implementation for User Story 6
 
-- [ ] T025 [US6] Regression pass: draft `.editor` thumbnail, «Векторизовать», «Удалить слово», layout toolbar batch unchanged in `handwritingocr.client/src/App.tsx`
-- [ ] T026 [US6] Verify DnD reorder updates vector slot positions to match `displayLines` without save in `handwritingocr.client/src/ScanVectorsPanel.tsx`
-- [ ] T027 [US6] Verify switching `scanId` clears panel (no thumbnails from previous scan) via props reset in `handwritingocr.client/src/App.tsx`
+- [x] T025 [US6] Regression pass: draft `.editor` thumbnail, «Векторизовать», «Удалить слово», layout toolbar batch unchanged in `handwritingocr.client/src/App.tsx`
+- [x] T026 [US6] Verify DnD reorder updates vector slot positions to match `displayLines` without save in `handwritingocr.client/src/ScanVectorsPanel.tsx`
+- [x] T027 [US6] Verify switching `scanId` clears panel (no thumbnails from previous scan) via props reset in `handwritingocr.client/src/App.tsx`
 
 **Checkpoint**: Смежный UX не сломан
 
@@ -147,8 +147,8 @@
 
 **Purpose**: Финальная приёмка и визуальная полировка
 
-- [ ] T028 Run full manual validation per `specs/010-scan-vectors-panel/quickstart.md` (all sections §1–§10)
-- [ ] T029 [P] Tune horizontal spacing/gap between `.vector-slot` elements to align visually with word spacing in `.recognized-text` in `handwritingocr.client/src/App.css`
+- [x] T028 Run full manual validation per `specs/010-scan-vectors-panel/quickstart.md` (all sections §1–§10)
+- [x] T029 [P] Tune horizontal spacing/gap between `.vector-slot` elements to align visually with word spacing in `.recognized-text` in `handwritingocr.client/src/App.css`
 
 ---
 
