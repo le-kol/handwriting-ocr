@@ -205,12 +205,26 @@ namespace handwritingOCR.Server.Controllers
             return NoContent();
         }
 
-        [HttpPost("{id}/words/{wordId}/vectorize")]
-        public async Task<IActionResult> VectorizeWord(int id, int wordId)
+        [HttpGet("vectorization-defaults")]
+        public IActionResult GetVectorizationDefaults()
         {
             try
             {
-                var word = await _wordVectorizationService.VectorizeAsync(id, wordId);
+                var (paddingPx, approximationTolerance) = _wordVectorizationService.GetDefaults();
+                return Ok(new { paddingPx, approximationTolerance });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, ex.Message);
+            }
+        }
+
+        [HttpPost("{id}/words/{wordId}/vectorize")]
+        public async Task<IActionResult> VectorizeWord(int id, int wordId, [FromBody] VectorizationRunParamsDto? body = null)
+        {
+            try
+            {
+                var word = await _wordVectorizationService.VectorizeAsync(id, wordId, body);
                 return Ok(word);
             }
             catch (ResourceNotFoundException ex)
@@ -228,16 +242,20 @@ namespace handwritingOCR.Server.Controllers
         }
 
         [HttpPost("{id}/vectorize-batch")]
-        public async Task<IActionResult> VectorizeBatch(int id)
+        public async Task<IActionResult> VectorizeBatch(int id, [FromBody] VectorizationRunParamsDto? body = null)
         {
             try
             {
-                var words = await _wordVectorizationService.VectorizeBatchAsync(id);
+                var words = await _wordVectorizationService.VectorizeBatchAsync(id, body);
                 return Ok(words);
             }
             catch (ResourceNotFoundException ex)
             {
                 return NotFound(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (InvalidOperationException ex)
             {

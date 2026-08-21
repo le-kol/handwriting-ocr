@@ -260,9 +260,15 @@ async function fetchScansPageWithRetry(
     throw lastError ?? new Error("Не удалось загрузить список сканов");
 }
 
-function vectorizeWord(scanId: number, wordId: number): Promise<Word> {
+function vectorizeWord(
+    scanId: number,
+    wordId: number,
+    params: { paddingPx: number; approximationTolerance: number },
+): Promise<Word> {
     return fetch("/api/Scans/" + scanId + "/words/" + wordId + "/vectorize", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
     }).then(function (response) {
         if (!response.ok) {
             return response.text().then(function (message) {
@@ -297,9 +303,14 @@ function deleteScan(id: number): Promise<void> {
     });
 }
 
-function vectorizeBatch(scanId: number): Promise<Word[]> {
+function vectorizeBatch(
+    scanId: number,
+    params: { paddingPx: number; approximationTolerance: number },
+): Promise<Word[]> {
     return fetch("/api/Scans/" + scanId + "/vectorize-batch", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
     }).then(function (response) {
         if (!response.ok) {
             return response.text().then(function (message) {
@@ -308,6 +319,50 @@ function vectorizeBatch(scanId: number): Promise<Word[]> {
         }
         return response.json() as Promise<Word[]>;
     });
+}
+
+type VectorizationDefaults = {
+    paddingPx: number;
+    approximationTolerance: number;
+};
+
+type RunParamsState = {
+    paddingPx: string;
+    approximationTolerance: string;
+};
+
+function fetchVectorizationDefaults(): Promise<VectorizationDefaults> {
+    return fetch("/api/Scans/vectorization-defaults").then(function (response) {
+        if (!response.ok) {
+            return response.text().then(function (message) {
+                throw new Error(message || String(response.status));
+            });
+        }
+        return response.json() as Promise<VectorizationDefaults>;
+    });
+}
+
+function defaultsToRunParamsState(defaults: VectorizationDefaults): RunParamsState {
+    return {
+        paddingPx: String(defaults.paddingPx),
+        approximationTolerance: String(defaults.approximationTolerance),
+    };
+}
+
+function validateRunParams(paddingStr: string, toleranceStr: string): string | null {
+    const errors: string[] = [];
+    const padding = Number(paddingStr);
+    const tolerance = Number(toleranceStr);
+
+    if (paddingStr.trim() === "" || Number.isNaN(padding) || padding < 0) {
+        errors.push("Отступ не может быть отрицательным.");
+    }
+
+    if (toleranceStr.trim() === "" || Number.isNaN(tolerance) || tolerance <= 0) {
+        errors.push("Допустимая погрешность должна быть больше 0.");
+    }
+
+    return errors.length > 0 ? errors.join(" ") : null;
 }
 
 function removeWordFromLayout(lines: Word[][] | null, wordId: number): Word[][] | null {
@@ -373,6 +428,18 @@ function App() {
     const [vectorizingWordId, setVectorizingWordId] = useState<number | null>(null);
     const [isBatchVectorizing, setIsBatchVectorizing] = useState(false);
     const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null);
+    const [loadedDefaults, setLoadedDefaults] = useState<VectorizationDefaults | null>(null);
+    const loadedDefaultsRef = useRef<VectorizationDefaults | null>(null);
+    loadedDefaultsRef.current = loadedDefaults;
+    const [defaultsLoadError, setDefaultsLoadError] = useState<string | null>(null);
+    const [singleRunParams, setSingleRunParams] = useState<RunParamsState>({
+        paddingPx: "",
+        approximationTolerance: "",
+    });
+    const [batchRunParams, setBatchRunParams] = useState<RunParamsState>({
+        paddingPx: "",
+        approximationTolerance: "",
+    });
     const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
     const [scanItems, setScanItems] = useState<ScanListItem[]>([]);
     const [totalCount, setTotalCount] = useState(0);
@@ -405,6 +472,40 @@ function App() {
     layoutLinesRef.current = layoutLines;
     const inlineEditingWordIdRef = useRef(inlineEditingWordId);
     inlineEditingWordIdRef.current = inlineEditingWordId;
+
+    inlineEditingWordIdRef.current = inlineEditingWordId;
+
+    function resetRunParamsToDefaults(defaults: VectorizationDefaults) {
+        const state = defaultsToRunParamsState(defaults);
+        setSingleRunParams(state);
+        setBatchRunParams({ ...state });
+    }
+
+    useEffect(function () {
+        if (scanId === null) {
+            setDefaultsLoadError(null);
+            setLoadedDefaults(null);
+            return;
+        }
+
+        const requestScanId = scanId;
+        const generation = editorGenerationRef.current;
+        setDefaultsLoadError(null);
+
+        fetchVectorizationDefaults().then(function (defaults) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
+            setLoadedDefaults(defaults);
+            resetRunParamsToDefaults(defaults);
+        }).catch(function (error) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
+                return;
+            }
+            setDefaultsLoadError(error instanceof Error ? error.message : String(error));
+            setLoadedDefaults(null);
+        });
+    }, [scanId]);
 
     function selectWord(word: Word) {
         const canonical = words?.find(function (item) { return item.id === word.id; });
@@ -609,12 +710,22 @@ function App() {
             return;
         }
 
+        const validationError = validateRunParams(singleRunParams.paddingPx, singleRunParams.approximationTolerance);
+        if (validationError) {
+            setVectorizeStatus(validationError);
+            return;
+        }
+
         const requestScanId = scanId;
         const generation = editorGenerationRef.current;
+        const params = {
+            paddingPx: Number(singleRunParams.paddingPx),
+            approximationTolerance: Number(singleRunParams.approximationTolerance),
+        };
         setVectorizingWordId(word.id);
         setVectorizeStatus("Векторизация слова…");
 
-        vectorizeWord(requestScanId, word.id).then(function (updated) {
+        vectorizeWord(requestScanId, word.id, params).then(function (updated) {
             if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
                 return;
             }
@@ -636,6 +747,9 @@ function App() {
                 return { ...current, ...updated };
             });
             setVectorizeStatus("Векторизация завершена");
+            if (loadedDefaultsRef.current) {
+                resetRunParamsToDefaults(loadedDefaultsRef.current);
+            }
         }).catch(function (error) {
             if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
                 return;
@@ -681,12 +795,22 @@ function App() {
             return;
         }
 
+        const validationError = validateRunParams(batchRunParams.paddingPx, batchRunParams.approximationTolerance);
+        if (validationError) {
+            setVectorizeStatus(validationError);
+            return;
+        }
+
         const requestScanId = scanId;
         const generation = editorGenerationRef.current;
+        const params = {
+            paddingPx: Number(batchRunParams.paddingPx),
+            approximationTolerance: Number(batchRunParams.approximationTolerance),
+        };
         setIsBatchVectorizing(true);
         setVectorizeStatus("Пакетная векторизация…");
 
-        vectorizeBatch(requestScanId).then(function (data) {
+        vectorizeBatch(requestScanId, params).then(function (data) {
             if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
                 return;
             }
@@ -700,6 +824,9 @@ function App() {
                 return updated ? { ...current, ...updated } : current;
             });
             setVectorizeStatus("Пакетная векторизация завершена");
+            if (loadedDefaultsRef.current) {
+                resetRunParamsToDefaults(loadedDefaultsRef.current);
+            }
         }).catch(function (error) {
             if (editorGenerationRef.current !== generation || scanIdRef.current !== requestScanId) {
                 return;
@@ -1230,13 +1357,48 @@ function App() {
                                     >
                                         {isSavingLayout ? "Сохранение..." : "Сохранить порядок"}
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleBatchVectorizeClick}
-                                        disabled={isBatchVectorizing || vectorizingWordId !== null}
-                                    >
-                                        {isBatchVectorizing ? "Пакетная векторизация…" : "Векторизовать все слова"}
-                                    </button>
+                                    {defaultsLoadError ? (
+                                        <p className="vectorize-defaults-error">{defaultsLoadError}</p>
+                                    ) : (
+                                        <>
+                                            <div className="vectorize-run-params">
+                                                <label>
+                                                    Отступ, px{" "}
+                                                    <input
+                                                        type="number"
+                                                        value={batchRunParams.paddingPx}
+                                                        onChange={function (event) {
+                                                            setBatchRunParams(function (current) {
+                                                                return { ...current, paddingPx: event.target.value };
+                                                            });
+                                                        }}
+                                                    />
+                                                </label>
+                                                <label>
+                                                    Погрешность, px{" "}
+                                                    <input
+                                                        type="number"
+                                                        value={batchRunParams.approximationTolerance}
+                                                        onChange={function (event) {
+                                                            setBatchRunParams(function (current) {
+                                                                return {
+                                                                    ...current,
+                                                                    approximationTolerance: event.target.value,
+                                                                };
+                                                            });
+                                                        }}
+                                                    />
+                                                </label>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleBatchVectorizeClick}
+                                                disabled={isBatchVectorizing || vectorizingWordId !== null}
+                                            >
+                                                {isBatchVectorizing ? "Пакетная векторизация…" : "Векторизовать все слова"}
+                                            </button>
+                                        </>
+                                    )}
                                     <p>{layoutSaveStatus}</p>
                                     {vectorizeStatus ? <p>{vectorizeStatus}</p> : null}
                                 </div>
@@ -1366,14 +1528,49 @@ function App() {
                             <WordCurveThumbnail curvePoints={draft.curvePoints} />
                         ) : null}
                         <div className="editor-actions">
-                            {draft.id > 0 && !isWordVectorized(draft) ? (
-                                <button
-                                    type="button"
-                                    onClick={function () { handleVectorizeClick(draft); }}
-                                    disabled={vectorizingWordId === draft.id || isBatchVectorizing}
-                                >
-                                    {vectorizingWordId === draft.id ? "Векторизация…" : "Векторизовать"}
-                                </button>
+                            {draft.id > 0 ? (
+                                defaultsLoadError ? (
+                                    <p className="vectorize-defaults-error">{defaultsLoadError}</p>
+                                ) : (
+                                    <>
+                                        <div className="vectorize-run-params">
+                                            <label>
+                                                Отступ, px{" "}
+                                                <input
+                                                    type="number"
+                                                    value={singleRunParams.paddingPx}
+                                                    onChange={function (event) {
+                                                        setSingleRunParams(function (current) {
+                                                            return { ...current, paddingPx: event.target.value };
+                                                        });
+                                                    }}
+                                                />
+                                            </label>
+                                            <label>
+                                                Погрешность, px{" "}
+                                                <input
+                                                    type="number"
+                                                    value={singleRunParams.approximationTolerance}
+                                                    onChange={function (event) {
+                                                        setSingleRunParams(function (current) {
+                                                            return {
+                                                                ...current,
+                                                                approximationTolerance: event.target.value,
+                                                            };
+                                                        });
+                                                    }}
+                                                />
+                                            </label>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={function () { handleVectorizeClick(draft); }}
+                                            disabled={vectorizingWordId === draft.id || isBatchVectorizing}
+                                        >
+                                            {vectorizingWordId === draft.id ? "Векторизация…" : "Векторизовать"}
+                                        </button>
+                                    </>
+                                )
                             ) : null}
                             {draft.id > 0 ? (
                                 <button type="button" onClick={handleDeleteClick}>

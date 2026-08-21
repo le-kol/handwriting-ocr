@@ -26,7 +26,7 @@
 
 **Purpose**: Подтвердить brownfield-зависимости перед расширением API и UI
 
-- [ ] T001 Confirm prerequisites: `WordVectorizationService`, `WordVectorizationOptions`, `POST …/vectorize`, `POST …/vectorize-batch`, `vectorizeWord`/`vectorizeBatch`/`handleVectorizeClick`/`handleBatchVectorizeClick` in `handwritingOCR.Server/Services/WordVectorizationService.cs`, `handwritingOCR.Server/Options/WordVectorizationOptions.cs`, `handwritingOCR.Server/Controllers/ScansController.cs`, `handwritingocr.client/src/App.tsx` per `specs/011-vectorize-run-params/plan.md`
+- [X] T001 Confirm prerequisites: `WordVectorizationService`, `WordVectorizationOptions`, `POST …/vectorize`, `POST …/vectorize-batch`, `vectorizeWord`/`vectorizeBatch`/`handleVectorizeClick`/`handleBatchVectorizeClick` in `handwritingOCR.Server/Services/WordVectorizationService.cs`, `handwritingOCR.Server/Options/WordVectorizationOptions.cs`, `handwritingOCR.Server/Controllers/ScansController.cs`, `handwritingocr.client/src/App.tsx` per `specs/011-vectorize-run-params/plan.md`
 
 ---
 
@@ -36,14 +36,14 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 [P] Create `VectorizationRunParamsDto` with nullable `float? PaddingPx` and `float? ApproximationTolerance` in `handwritingOCR.Server/Models/VectorizationRunParamsDto.cs`
-- [ ] T003 Add `ValidateAndResolveRunParams(VectorizationRunParamsDto?)` returning `(float paddingPx, float approximationTolerance)` with combined RU `ArgumentException` for multiple invalid fields in `handwritingOCR.Server/Services/WordVectorizationService.cs`
-- [ ] T004 Refactor `VectorizeWordCoreAsync` to accept `float paddingPx, float approximationTolerance` instead of reading `_options` directly in `handwritingOCR.Server/Services/WordVectorizationService.cs`
-- [ ] T005 Update `VectorizeAsync(int scanId, int wordId, VectorizationRunParamsDto? runParams = null)` to resolve params via `ValidateAndResolveRunParams` and pass to core in `handwritingOCR.Server/Services/WordVectorizationService.cs`
-- [ ] T006 Add `GET /api/Scans/vectorization-defaults` returning JSON `{ paddingPx, approximationTolerance }` or 503 plain text via `EnsureOptionsValid` in `handwritingOCR.Server/Controllers/ScansController.cs`
-- [ ] T007 Extend `POST …/words/{wordId}/vectorize` with optional `[FromBody] VectorizationRunParamsDto? body` passed to `VectorizeAsync` in `handwritingOCR.Server/Controllers/ScansController.cs`
-- [ ] T008 Update `VectorizeBatchAsync(int scanId, VectorizationRunParamsDto? runParams = null)` to resolve once and pass same pair to each `VectorizeWordCoreAsync` call in `handwritingOCR.Server/Services/WordVectorizationService.cs`
-- [ ] T009 Extend `POST …/vectorize-batch` with optional `[FromBody] VectorizationRunParamsDto? body` passed to `VectorizeBatchAsync` in `handwritingOCR.Server/Controllers/ScansController.cs`
+- [X] T002 [P] Create `VectorizationRunParamsDto` with nullable `float? PaddingPx` and `float? ApproximationTolerance` in `handwritingOCR.Server/Models/VectorizationRunParamsDto.cs`
+- [X] T003 Add `ValidateAndResolveRunParams(VectorizationRunParamsDto?)` returning `(float paddingPx, float approximationTolerance)` with combined RU `ArgumentException` for multiple invalid fields in `handwritingOCR.Server/Services/WordVectorizationService.cs`
+- [X] T004 Refactor `VectorizeWordCoreAsync` to accept `float paddingPx, float approximationTolerance` instead of reading `_options` directly in `handwritingOCR.Server/Services/WordVectorizationService.cs`
+- [X] T005 Update `VectorizeAsync(int scanId, int wordId, VectorizationRunParamsDto? runParams = null)` to resolve params via `ValidateAndResolveRunParams` and pass to core in `handwritingOCR.Server/Services/WordVectorizationService.cs`
+- [X] T006 Add `GET /api/Scans/vectorization-defaults` returning JSON `{ paddingPx, approximationTolerance }` or 503 plain text via `EnsureOptionsValid` in `handwritingOCR.Server/Controllers/ScansController.cs`
+- [X] T007 Extend `POST …/words/{wordId}/vectorize` with optional `[FromBody] VectorizationRunParamsDto? body` passed to `VectorizeAsync` in `handwritingOCR.Server/Controllers/ScansController.cs`
+- [X] T008 Update `VectorizeBatchAsync(int scanId, VectorizationRunParamsDto? runParams = null)` to resolve once and pass same pair to each `VectorizeWordCoreAsync` call in `handwritingOCR.Server/Services/WordVectorizationService.cs`
+- [X] T009 Extend `POST …/vectorize-batch` with optional `[FromBody] VectorizationRunParamsDto? body` passed to `VectorizeBatchAsync` in `handwritingOCR.Server/Controllers/ScansController.cs`
 
 **Checkpoint**: Swagger/curl — GET defaults 200; POST vectorize/batch с body и без body; 400 при невалидных params; без body поведение как до фичи
 
@@ -57,12 +57,12 @@
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Add `fetchVectorizationDefaults(): Promise<{ paddingPx: number; approximationTolerance: number }>` with plain-text error handling in `handwritingocr.client/src/App.tsx` per `contracts/vectorization-defaults-api.md`
-- [ ] T011 [US1] Add `singleRunParams` state (`paddingPx`/`approximationTolerance` as strings) and populate from GET defaults when scan opens in `handwritingocr.client/src/App.tsx`
-- [ ] T012 [US1] Render labeled number inputs (RU: «Отступ, px», «Погрешность, px») in `.editor-actions` before «Векторизовать» button in `handwritingocr.client/src/App.tsx` per `contracts/vectorize-run-params-ui.md`
-- [ ] T013 [US1] Update `vectorizeWord(scanId, wordId, params)` to `POST` with `Content-Type: application/json` body in `handwritingocr.client/src/App.tsx`
-- [ ] T014 [US1] Parse `singleRunParams` to numbers and pass to `vectorizeWord` from `handleVectorizeClick` in `handwritingocr.client/src/App.tsx`
-- [ ] T015 [US1] On defaults fetch failure show `<p className="vectorize-defaults-error">` instead of single fields and «Векторизовать» button in `handwritingocr.client/src/App.tsx` (FR-015)
+- [X] T010 [US1] Add `fetchVectorizationDefaults(): Promise<{ paddingPx: number; approximationTolerance: number }>` with plain-text error handling in `handwritingocr.client/src/App.tsx` per `contracts/vectorization-defaults-api.md`
+- [X] T011 [US1] Add `singleRunParams` state (`paddingPx`/`approximationTolerance` as strings) and populate from GET defaults when scan opens in `handwritingocr.client/src/App.tsx`
+- [X] T012 [US1] Render labeled number inputs (RU: «Отступ, px», «Погрешность, px») in `.editor-actions` before «Векторизовать» button in `handwritingocr.client/src/App.tsx` per `contracts/vectorize-run-params-ui.md`
+- [X] T013 [US1] Update `vectorizeWord(scanId, wordId, params)` to `POST` with `Content-Type: application/json` body in `handwritingocr.client/src/App.tsx`
+- [X] T014 [US1] Parse `singleRunParams` to numbers and pass to `vectorizeWord` from `handleVectorizeClick` in `handwritingocr.client/src/App.tsx`
+- [X] T015 [US1] On defaults fetch failure show `<p className="vectorize-defaults-error">` instead of single fields and «Векторизовать» button in `handwritingocr.client/src/App.tsx` (FR-015)
 
 **Checkpoint**: MVP — одиночная векторизация с настраиваемыми параметрами через UI
 
@@ -76,11 +76,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] Add independent `batchRunParams` state initialized from same GET defaults (not synced with `singleRunParams`) in `handwritingocr.client/src/App.tsx`
-- [ ] T017 [US2] Render separate labeled inputs in `.layout-toolbar` before «Векторизовать все слова» in `handwritingocr.client/src/App.tsx`
-- [ ] T018 [US2] Update `vectorizeBatch(scanId, params)` to POST JSON body in `handwritingocr.client/src/App.tsx`
-- [ ] T019 [US2] Parse `batchRunParams` and pass to `vectorizeBatch` from `handleBatchVectorizeClick` in `handwritingocr.client/src/App.tsx`
-- [ ] T020 [US2] On defaults fetch failure show error text instead of batch fields and «Векторизовать все слова» in `.layout-toolbar` in `handwritingocr.client/src/App.tsx` (FR-015)
+- [X] T016 [US2] Add independent `batchRunParams` state initialized from same GET defaults (not synced with `singleRunParams`) in `handwritingocr.client/src/App.tsx`
+- [X] T017 [US2] Render separate labeled inputs in `.layout-toolbar` before «Векторизовать все слова» in `handwritingocr.client/src/App.tsx`
+- [X] T018 [US2] Update `vectorizeBatch(scanId, params)` to POST JSON body in `handwritingocr.client/src/App.tsx`
+- [X] T019 [US2] Parse `batchRunParams` and pass to `vectorizeBatch` from `handleBatchVectorizeClick` in `handwritingocr.client/src/App.tsx`
+- [X] T020 [US2] On defaults fetch failure show error text instead of batch fields and «Векторизовать все слова» in `.layout-toolbar` in `handwritingocr.client/src/App.tsx` (FR-015)
 
 **Checkpoint**: Оба набора полей работают независимо; batch API получает override params
 
@@ -94,10 +94,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] Add `validateRunParams(paddingStr, toleranceStr): string | null` returning combined RU message for all violations in `handwritingocr.client/src/App.tsx`
-- [ ] T022 [US3] Call `validateRunParams` in `handleVectorizeClick` before fetch; on failure set `vectorizeStatus` and return without POST in `handwritingocr.client/src/App.tsx`
-- [ ] T023 [US3] Call `validateRunParams` in `handleBatchVectorizeClick` before fetch; on failure set `vectorizeStatus` and return without POST in `handwritingocr.client/src/App.tsx`
-- [ ] T024 [US3] Ensure empty/non-numeric input is rejected client-side with same rules as spec edge cases in `validateRunParams` in `handwritingocr.client/src/App.tsx`
+- [X] T021 [US3] Add `validateRunParams(paddingStr, toleranceStr): string | null` returning combined RU message for all violations in `handwritingocr.client/src/App.tsx`
+- [X] T022 [US3] Call `validateRunParams` in `handleVectorizeClick` before fetch; on failure set `vectorizeStatus` and return without POST in `handwritingocr.client/src/App.tsx`
+- [X] T023 [US3] Call `validateRunParams` in `handleBatchVectorizeClick` before fetch; on failure set `vectorizeStatus` and return without POST in `handwritingocr.client/src/App.tsx`
+- [X] T024 [US3] Ensure empty/non-numeric input is rejected client-side with same rules as spec edge cases in `validateRunParams` in `handwritingocr.client/src/App.tsx`
 
 **Checkpoint**: 100% локальных invalid attempts не отправляют HTTP; серверная 400 дублирует правила для API-only вызовов
 
@@ -111,8 +111,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T025 [US4] On `scanId` change refetch defaults and reset both `singleRunParams` and `batchRunParams` in `handwritingocr.client/src/App.tsx`
-- [ ] T026 [US4] After successful single or batch vectorize reset both param states to last loaded server defaults in `handwritingocr.client/src/App.tsx`
+- [X] T025 [US4] On `scanId` change refetch defaults and reset both `singleRunParams` and `batchRunParams` in `handwritingocr.client/src/App.tsx`
+- [X] T026 [US4] After successful single or batch vectorize reset both param states to last loaded server defaults in `handwritingocr.client/src/App.tsx`
 
 **Checkpoint**: FR-012 — нет persist в localStorage/state между сессиями скана
 
@@ -122,8 +122,8 @@
 
 **Purpose**: Стили и полная ручная приёмка
 
-- [ ] T027 [P] Add CSS for `.vectorize-run-params` inputs/labels and `.vectorize-defaults-error` in `handwritingocr.client/src/App.css`
-- [ ] T028 Run all scenarios in `specs/011-vectorize-run-params/quickstart.md` and fix regressions in touched files
+- [X] T027 [P] Add CSS for `.vectorize-run-params` inputs/labels and `.vectorize-defaults-error` in `handwritingocr.client/src/App.css`
+- [X] T028 Run all scenarios in `specs/011-vectorize-run-params/quickstart.md` and fix regressions in touched files
 
 ---
 

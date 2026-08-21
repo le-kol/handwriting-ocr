@@ -30,9 +30,46 @@ namespace handwritingOCR.Server.Services
             _options = options.Value;
         }
 
-        public async Task<Word> VectorizeAsync(int scanId, int wordId)
+        public (float PaddingPx, float ApproximationTolerance) GetDefaults()
         {
             EnsureOptionsValid();
+            return (_options.PaddingPx!.Value, _options.ApproximationTolerance!.Value);
+        }
+
+        public (float paddingPx, float approximationTolerance) ValidateAndResolveRunParams(VectorizationRunParamsDto? runParams)
+        {
+            var errors = new List<string>();
+
+            if (runParams?.PaddingPx is float padding && padding < 0)
+            {
+                errors.Add("Отступ не может быть отрицательным.");
+            }
+
+            if (runParams?.ApproximationTolerance is float tolerance && tolerance <= 0)
+            {
+                errors.Add("Допустимая погрешность должна быть больше 0.");
+            }
+
+            if (errors.Count > 0)
+            {
+                throw new ArgumentException(string.Join(" ", errors));
+            }
+
+            var needsConfigFallback = runParams?.PaddingPx is null || runParams.ApproximationTolerance is null;
+            if (needsConfigFallback)
+            {
+                EnsureOptionsValid();
+            }
+
+            var effectivePadding = runParams?.PaddingPx ?? _options.PaddingPx!.Value;
+            var effectiveTolerance = runParams?.ApproximationTolerance ?? _options.ApproximationTolerance!.Value;
+
+            return (effectivePadding, effectiveTolerance);
+        }
+
+        public async Task<Word> VectorizeAsync(int scanId, int wordId, VectorizationRunParamsDto? runParams = null)
+        {
+            var (paddingPx, approximationTolerance) = ValidateAndResolveRunParams(runParams);
 
             var path = await _scanDbService.GetScanPathAsync(scanId);
             if (path == null)
@@ -52,12 +89,12 @@ namespace handwritingOCR.Server.Services
                 throw new ResourceNotFoundException("Не найден файл");
             }
 
-            return await VectorizeWordCoreAsync(word, fileBytes, scanId);
+            return await VectorizeWordCoreAsync(word, fileBytes, scanId, paddingPx, approximationTolerance);
         }
 
-        public async Task<IReadOnlyList<Word>> VectorizeBatchAsync(int scanId)
+        public async Task<IReadOnlyList<Word>> VectorizeBatchAsync(int scanId, VectorizationRunParamsDto? runParams = null)
         {
-            EnsureOptionsValid();
+            var (paddingPx, approximationTolerance) = ValidateAndResolveRunParams(runParams);
 
             var path = await _scanDbService.GetScanPathAsync(scanId);
             if (path == null)
@@ -74,7 +111,7 @@ namespace handwritingOCR.Server.Services
                 {
                     try
                     {
-                        await VectorizeWordCoreAsync(word, fileBytes, scanId);
+                        await VectorizeWordCoreAsync(word, fileBytes, scanId, paddingPx, approximationTolerance);
                     }
                     catch (ArgumentException)
                     {
@@ -90,7 +127,12 @@ namespace handwritingOCR.Server.Services
             return await _wordDbService.GetWordsByScanIdAsync(scanId);
         }
 
-        private async Task<Word> VectorizeWordCoreAsync(Word word, byte[] fileBytes, int scanId)
+        private async Task<Word> VectorizeWordCoreAsync(
+            Word word,
+            byte[] fileBytes,
+            int scanId,
+            float paddingPx,
+            float approximationTolerance)
         {
             // Полный новый вектор считаем до любой записи в БД — сбой не затирает прежний curve_points
             using var fragment = _fragmentExtractor.ExtractAlignedFragment(
@@ -103,9 +145,9 @@ namespace handwritingOCR.Server.Services
                 word.Y3,
                 word.X4,
                 word.Y4,
-                _options.PaddingPx!.Value);
+                paddingPx);
 
-            var curvePoints = _strokeBezierFitter.Fit(fragment, _options.ApproximationTolerance!.Value);
+            var curvePoints = _strokeBezierFitter.Fit(fragment, approximationTolerance);
 
             var updated = await _wordDbService.UpdateCurvePointsAsync(scanId, word.Id, curvePoints);
             if (updated == null)
