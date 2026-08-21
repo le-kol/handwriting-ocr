@@ -27,6 +27,96 @@ namespace handwritingOCR.Server.Services
             return await LoadWordsAsync(connection, null, scanId);
         }
 
+        public async Task<WordListPage> GetWordsPageAsync(
+            int page,
+            int pageSize,
+            string? search,
+            string vectorizedFilter,
+            int? scanId)
+        {
+            await using var connection = await OpenConnectionAsync();
+
+            var conditions = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                // ESCAPE '\' — иначе %/_ в подстроке поиска меняют семантику ILIKE
+                conditions.Add("word ILIKE '%' || @search || '%' ESCAPE '\\'");
+            }
+
+            if (vectorizedFilter == "true")
+            {
+                conditions.Add("curve_points IS NOT NULL");
+            }
+            else if (vectorizedFilter == "false")
+            {
+                conditions.Add("curve_points IS NULL");
+            }
+
+            if (scanId is > 0)
+            {
+                conditions.Add("scan_id = @scanId");
+            }
+
+            var whereClause = conditions.Count > 0
+                ? " WHERE " + string.Join(" AND ", conditions)
+                : string.Empty;
+
+            const string selectColumns = """
+                id, scan_id, word, x1, y1, x2, y2, x3, y3, x4, y4, order_index, line_index, curve_points
+                """;
+
+            var countQuery = "SELECT COUNT(*) FROM words" + whereClause;
+            await using var countCommand = new NpgsqlCommand(countQuery, connection);
+            AddFilterParameters(countCommand, search, scanId);
+
+            var totalCount = Convert.ToInt32(await countCommand.ExecuteScalarAsync());
+
+            // Фиксированный порядок: сначала скан, затем порядок чтения внутри скана
+            var selectQuery = $"""
+                SELECT {selectColumns}
+                FROM words
+                {whereClause}
+                ORDER BY scan_id ASC, order_index ASC
+                LIMIT @pageSize OFFSET @offset
+                """;
+
+            await using var selectCommand = new NpgsqlCommand(selectQuery, connection);
+            AddFilterParameters(selectCommand, search, scanId);
+            selectCommand.Parameters.AddWithValue("pageSize", pageSize);
+            selectCommand.Parameters.AddWithValue("offset", (page - 1) * pageSize);
+
+            var items = new List<Word>();
+            await using var reader = await selectCommand.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                items.Add(ReadWord(reader));
+            }
+
+            return new WordListPage { Items = items, TotalCount = totalCount };
+        }
+
+        private static void AddFilterParameters(NpgsqlCommand command, string? search, int? scanId)
+        {
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                command.Parameters.AddWithValue("search", EscapeLikePattern(search.Trim()));
+            }
+
+            if (scanId is > 0)
+            {
+                command.Parameters.AddWithValue("scanId", scanId.Value);
+            }
+        }
+
+        private static string EscapeLikePattern(string value)
+        {
+            return value
+                .Replace("\\", "\\\\")
+                .Replace("%", "\\%")
+                .Replace("_", "\\_");
+        }
+
         public async Task<IReadOnlyList<Word>> GetUnvectorizedWordsByScanIdAsync(int scanId)
         {
             await using var connection = await OpenConnectionAsync();

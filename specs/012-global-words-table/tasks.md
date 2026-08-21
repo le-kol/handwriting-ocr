@@ -24,7 +24,7 @@
 
 **Purpose**: Убедиться, что brownfield-зависимости на месте
 
-- [ ] T001 Verify prerequisites: `ScanList:PageSize` (30) in `handwritingOCR.Server/appsettings.json`, existing `GET /api/Scans/{id}/words` returns full `Word` with `curvePoints`, `handwritingocr.client/src/curvePoints.ts` exports `isWordVectorized` and `filterValidCurves`, `WordCurveThumbnail.tsx` renders valid curves
+- [X] T001 Verify prerequisites: `ScanList:PageSize` (30) in `handwritingOCR.Server/appsettings.json`, existing `GET /api/Scans/{id}/words` returns full `Word` with `curvePoints`, `handwritingocr.client/src/curvePoints.ts` exports `isWordVectorized` and `filterValidCurves`, `WordCurveThumbnail.tsx` renders valid curves
 
 ---
 
@@ -34,9 +34,9 @@
 
 **⚠️ CRITICAL**: User story phases не начинать, пока фаза не завершена
 
-- [ ] T002 [P] Add `WordListPage` model (`Items`, `TotalCount`) in `handwritingOCR.Server/Models/WordListPage.cs` per `specs/012-global-words-table/data-model.md`
-- [ ] T003 Implement `GetWordsPageAsync(int page, int pageSize, string? search, string vectorizedFilter, int? scanId)` in `handwritingOCR.Server/Services/WordDbService.cs`: dynamic WHERE (`ILIKE` with escaped `%`/`_`/`\`, `curve_points IS NULL/NOT NULL`, optional `scan_id`); `COUNT(*)` + `SELECT … ORDER BY scan_id ASC, order_index ASC LIMIT/OFFSET`; reuse `ReadWord`
-- [ ] T004 Add `WordsController` with `GET /api/Words` in `handwritingOCR.Server/Controllers/WordsController.cs` per `specs/012-global-words-table/contracts/words-list-api.md`: inject `WordDbService`, `IOptions<ScanListOptions>`; validate `page >= 1`, `vectorized` in `all`/`true`/`false`; `PageSize <= 0` → 503; return `200` JSON `{ items, totalCount }`; plain-text RU errors
+- [X] T002 [P] Add `WordListPage` model (`Items`, `TotalCount`) in `handwritingOCR.Server/Models/WordListPage.cs` per `specs/012-global-words-table/data-model.md`
+- [X] T003 Implement `GetWordsPageAsync(int page, int pageSize, string? search, string vectorizedFilter, int? scanId)` in `handwritingOCR.Server/Services/WordDbService.cs`: dynamic WHERE (`ILIKE` with escaped `%`/`_`/`\`, `curve_points IS NULL/NOT NULL`, optional `scan_id`); `COUNT(*)` + `SELECT … ORDER BY scan_id ASC, order_index ASC LIMIT/OFFSET`; reuse `ReadWord`
+- [X] T004 Add `WordsController` with `GET /api/Words` in `handwritingOCR.Server/Controllers/WordsController.cs` per `specs/012-global-words-table/contracts/words-list-api.md`: inject `WordDbService`, `IOptions<ScanListOptions>`; validate `page >= 1`, `vectorized` in `all`/`true`/`false`; `PageSize <= 0` → 503; return `200` JSON `{ items, totalCount }`; plain-text RU errors
 
 **Checkpoint**: `curl GET /api/Words?page=1` returns paginated words; filters and `page=0` → 400 work per quickstart §1
 
@@ -50,11 +50,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T005 [P] [US1] Add client fetch helper `fetchWordsPage(params)` and types in `handwritingocr.client/src/wordsApi.ts` calling `GET /api/Words` with `page`, `search`, `vectorized`, `scanId`; `readError` on `!ok`; constant `WORDS_PAGE_SIZE = 30`
-- [ ] T006 [P] [US1] Create `WordsTableScreen.tsx` in `handwritingocr.client/src/WordsTableScreen.tsx`: props for filters state, `fetchWordsPage`, columns (text, scanId, status via `isWordVectorized`, `WordCurveThumbnail`), pagination controls, empty state; debounced search ~300 ms; scan filter select (load ids from existing `GET /api/Scans`)
-- [ ] T007 [US1] Add `appView: 'scans' | 'words'` state and nav buttons «Сканы» / «Слова» in `handwritingocr.client/src/App.tsx`: default `'scans'`; render `WordsTableScreen` when `'words'`; hide scans table/editor layout appropriately per `specs/012-global-words-table/contracts/words-table-ui.md`
-- [ ] T008 [US1] Wire `WordsTableScreen` data loading in `handwritingocr.client/src/App.tsx` or within component: reset `page` to 1 on filter/search change; display loading/error states in RU
-- [ ] T009 [P] [US1] Add styles for app nav and words table in `handwritingocr.client/src/App.css` (`.app-nav`, `.words-table`, pagination, filter row)
+- [X] T005 [P] [US1] Add client fetch helper `fetchWordsPage(params)` and types in `handwritingocr.client/src/wordsApi.ts` calling `GET /api/Words` with `page`, `search`, `vectorized`, `scanId`; `readError` on `!ok`; constant `WORDS_PAGE_SIZE = 30`
+- [X] T006 [P] [US1] Create `WordsTableScreen.tsx` in `handwritingocr.client/src/WordsTableScreen.tsx`: props for filters state, `fetchWordsPage`, columns (text, scanId, status via `isWordVectorized`, `WordCurveThumbnail`), pagination controls, empty state; debounced search ~300 ms; scan filter select (load ids from existing `GET /api/Scans`)
+- [X] T007 [US1] Add `appView: 'scans' | 'words'` state and nav buttons «Сканы» / «Слова» in `handwritingocr.client/src/App.tsx`: default `'scans'`; render `WordsTableScreen` when `'words'`; hide scans table/editor layout appropriately per `specs/012-global-words-table/contracts/words-table-ui.md`
+- [X] T008 [US1] Wire `WordsTableScreen` data loading in `handwritingocr.client/src/App.tsx` or within component: reset `page` to 1 on filter/search change; display loading/error states in RU
+- [X] T009 [P] [US1] Add styles for app nav and words table in `handwritingocr.client/src/App.css` (`.app-nav`, `.words-table`, pagination, filter row)
 
 **Checkpoint**: MVP — глобальная таблица с фильтрами и пагинацией без экспорта и без перехода в редактор
 
@@ -68,8 +68,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T010 [US2] Implement `openWordFromTable(scanId, wordId)` in `handwritingocr.client/src/App.tsx`: `setAppView('scans')`; reuse `handleScanRowClick(scanId)` pattern; after `fetchWords` resolve, call `selectWord` for `wordId` with generation guard (`editorGenerationRef` / `scanIdRef`)
-- [ ] T011 [US2] Pass `onRowClick(word)` from `App.tsx` to `WordsTableScreen` in `handwritingocr.client/src/WordsTableScreen.tsx`: row `onClick` invokes callback with full word; show error if scan/words load fails
+- [X] T010 [US2] Implement `openWordFromTable(scanId, wordId)` in `handwritingocr.client/src/App.tsx`: `setAppView('scans')`; reuse `handleScanRowClick(scanId)` pattern; after `fetchWords` resolve, call `selectWord` for `wordId` with generation guard (`editorGenerationRef` / `scanIdRef`)
+- [X] T011 [US2] Pass `onRowClick(word)` from `App.tsx` to `WordsTableScreen` in `handwritingocr.client/src/WordsTableScreen.tsx`: row `onClick` invokes callback with full word; show error if scan/words load fails
 
 **Checkpoint**: US1 + US2 — полный обзор и навигация в редактор
 
@@ -83,8 +83,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T012 [P] [US3] Create `exportWordsDataset.ts` in `handwritingocr.client/src/exportWordsDataset.ts`: `fetchAllWordsPages(query)` loop; `wordToDatasetLine(word)` → `{ wordId, scanId, lineIndex, text, curves: filterValidCurves(...) }`; skip empty curves; `downloadJsonl(filename, lines)` via Blob + temporary `<a download>`
-- [ ] T013 [US3] Add «Экспортировать всё» button in `handwritingocr.client/src/WordsTableScreen.tsx`: fetch all pages without search/scanId filters; filename `words-dataset-all.jsonl`; show `Экспортировано слов: N`; disable only this button during export; on fetch error show `Ошибка экспорта: …` without partial download as success
+- [X] T012 [P] [US3] Create `exportWordsDataset.ts` in `handwritingocr.client/src/exportWordsDataset.ts`: `fetchAllWordsPages(query)` loop; `wordToDatasetLine(word)` → `{ wordId, scanId, lineIndex, text, curves: filterValidCurves(...) }`; skip empty curves; `downloadJsonl(filename, lines)` via Blob + temporary `<a download>`
+- [X] T013 [US3] Add «Экспортировать всё» button in `handwritingocr.client/src/WordsTableScreen.tsx`: fetch all pages without search/scanId filters; filename `words-dataset-all.jsonl`; show `Экспортировано слов: N`; disable only this button during export; on fetch error show `Ошибка экспорта: …` without partial download as success
 
 **Checkpoint**: Полный JSONL-экспорт работает независимо от фильтров таблицы
 
@@ -98,8 +98,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T014 [US4] Extend `exportWordsDataset.ts` in `handwritingocr.client/src/exportWordsDataset.ts`: `exportFiltered(snapshot)` uses frozen `search`/`vectorized`/`scanId` from click moment; same line format and skip rules as «всё»
-- [ ] T015 [US4] Add «Экспортировать отфильтрованное» in `handwritingocr.client/src/WordsTableScreen.tsx`: disabled when `totalCount === 0` OR `vectorizedFilter === 'false'` (or label «Нет слов для экспорта»); filename `words-dataset-filtered.jsonl`; independent button loading state per `specs/012-global-words-table/contracts/dataset-export.md`
+- [X] T014 [US4] Extend `exportWordsDataset.ts` in `handwritingocr.client/src/exportWordsDataset.ts`: `exportFiltered(snapshot)` uses frozen `search`/`vectorized`/`scanId` from click moment; same line format and skip rules as «всё»
+- [X] T015 [US4] Add «Экспортировать отфильтрованное» in `handwritingocr.client/src/WordsTableScreen.tsx`: disabled when `totalCount === 0` OR `vectorizedFilter === 'false'` (or label «Нет слов для экспорта»); filename `words-dataset-filtered.jsonl`; independent button loading state per `specs/012-global-words-table/contracts/dataset-export.md`
 
 **Checkpoint**: Оба вида экспорта; таблица остаётся интерактивной во время экспорта
 
@@ -109,9 +109,9 @@
 
 **Purpose**: Сквозная проверка и регрессия
 
-- [ ] T016 [P] Run all scenarios in `specs/012-global-words-table/quickstart.md` and fix gaps against contracts in `specs/012-global-words-table/contracts/`
-- [ ] T017 [P] Add brief «почему» comments in `handwritingOCR.Server/Services/WordDbService.cs` for LIKE escaping and fixed sort order (`scan_id`, `order_index`)
-- [ ] T018 Confirm no regression: existing `GET /api/Scans/{id}/words`, word CRUD, vectorize single/batch unchanged; scans table and editor on «Сканы» screen work as before
+- [X] T016 [P] Run all scenarios in `specs/012-global-words-table/quickstart.md` and fix gaps against contracts in `specs/012-global-words-table/contracts/`
+- [X] T017 [P] Add brief «почему» comments in `handwritingOCR.Server/Services/WordDbService.cs` for LIKE escaping and fixed sort order (`scan_id`, `order_index`)
+- [X] T018 Confirm no regression: existing `GET /api/Scans/{id}/words`, word CRUD, vectorize single/batch unchanged; scans table and editor on «Сканы» screen work as before
 
 ---
 

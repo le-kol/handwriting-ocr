@@ -13,6 +13,8 @@ import {
 import ScanFrameOverlay from './ScanFrameOverlay';
 import ScanVectorsPanel from './ScanVectorsPanel';
 import InlineWordInput from './InlineWordInput';
+import WordsTableScreen from './WordsTableScreen';
+import type { Word as GlobalWord } from './wordsApi';
 import {
     caretIndexFromClick,
     distanceExceeded,
@@ -48,6 +50,8 @@ interface ScanListItem {
 const SCAN_PAGE_SIZE = 30;
 const SCANS_LIST_RETRY_ATTEMPTS = 5;
 const SCANS_LIST_RETRY_DELAY_MS = 1000;
+
+type AppView = 'scans' | 'words';
 
 function groupWordsByLine(words: Word[]): Word[][] {
     const byLine = new Map<number, Word[]>();
@@ -402,6 +406,7 @@ function applyWordUpdateInLayout(lines: Word[][] | null, updated: Word): Word[][
 }
 
 function App() {
+    const [appView, setAppView] = useState<AppView>('scans');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploadStatus, setUploadStatus] = useState<string | null>(null);
     const [scanId, setScanId] = useState<number | null>(null);
@@ -627,6 +632,36 @@ function App() {
             }
             setWordsOpenError("Не удалось загрузить слова: " + error.message);
         });
+    }
+
+    function openWordFromTable(targetScanId: number, wordId: number) {
+        setAppView('scans');
+        resetEditorState();
+        setWordsOpenError(null);
+        setScanId(targetScanId);
+        const generation = editorGenerationRef.current;
+        fetchWords(targetScanId).then(function (list) {
+            if (editorGenerationRef.current !== generation || scanIdRef.current !== targetScanId) {
+                return;
+            }
+            setWords(list);
+            syncLayoutFromWords(list);
+            const word = list.find(function (item) { return item.id === wordId; });
+            if (word) {
+                selectWord(word);
+            } else {
+                setWordsOpenError("Слово не найдено после перехода из таблицы");
+            }
+        }).catch(function (error) {
+            if (editorGenerationRef.current !== generation) {
+                return;
+            }
+            setWordsOpenError("Не удалось загрузить слова: " + error.message);
+        });
+    }
+
+    function handleWordsTableRowClick(word: GlobalWord) {
+        openWordFromTable(word.scanId, word.id);
     }
 
     function handleDeleteScan(id: number, options?: { refreshList?: boolean }) {
@@ -1325,7 +1360,26 @@ function App() {
 
     return (
         <div>
-            {scanId ? (
+            <nav className="app-nav">
+                <button
+                    type="button"
+                    className={appView === 'scans' ? 'active' : undefined}
+                    onClick={function () { setAppView('scans'); }}
+                >
+                    Сканы
+                </button>
+                <button
+                    type="button"
+                    className={appView === 'words' ? 'active' : undefined}
+                    onClick={function () { setAppView('words'); }}
+                >
+                    Слова
+                </button>
+            </nav>
+            {appView === 'words' ? (
+                <WordsTableScreen onRowClick={handleWordsTableRowClick} />
+            ) : null}
+            {appView === 'scans' && scanId ? (
                 <FramePreviewScope
                     words={words}
                     draft={draft}
@@ -1588,9 +1642,10 @@ function App() {
                 ) : null}
                 </FramePreviewScope>
             ) : null}
-            {words && words.length > 0 && draft === null ? (
+            {appView === 'scans' && words && words.length > 0 && draft === null ? (
                 <p>Выберите слово в тексте или рамку на скане, чтобы отредактировать</p>
             ) : null}
+            {appView === 'scans' ? (
             <section className="scans-section">
                 <table className="scans-table">
                     <thead>
@@ -1668,9 +1723,14 @@ function App() {
                 {wordsOpenError ? <p>{wordsOpenError}</p> : null}
                 {deleteScanStatus && !scanId ? <p>{deleteScanStatus}</p> : null}
             </section>
+            ) : null}
+            {appView === 'scans' ? (
+            <>
             <input type="file" ref={fileInputRef} accept=".jpeg, .jpg, .png" onChange={handleFileChange} />
             <p>Выбранный файл: {selectedFile ? selectedFile.name : "Не выбран"}</p>
             <p>Статус: {uploadStatus}</p>
+            </>
+            ) : null}
         </div>
     );
 }
